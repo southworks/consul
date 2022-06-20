@@ -293,7 +293,7 @@ func (c *configSnapshotTerminatingGateway) ValidDestinations() []structs.Service
 
 		// Skip the service if we haven't gotten our service config yet to know
 		// the protocol.
-		if _, ok := c.ServiceConfigs[svc]; !ok || c.ServiceConfigs[svc].Destination.Address == "" {
+		if _, ok := c.ServiceConfigs[svc]; !ok || len(c.ServiceConfigs[svc].Destination.Addresses) == 0 {
 			continue
 		}
 

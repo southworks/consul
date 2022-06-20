@@ -1674,7 +1674,7 @@ func TestServiceHealthEventsFromChanges(t *testing.T) {
 			configEntryDest := &structs.ServiceConfigEntry{
 				Kind:        structs.ServiceDefaults,
 				Name:        "destination1",
-				Destination: &structs.DestinationConfig{Port: 9000, Address: "kafka.test.com"},
+				Destination: &structs.DestinationConfig{Port: 9000, Addresses: []string{"kafka.test.com"}},
 			}
 			return ensureConfigEntryTxn(tx, tx.Index, configEntryDest)
 		},
@@ -1720,7 +1720,7 @@ func TestServiceHealthEventsFromChanges(t *testing.T) {
 			configEntryDest := &structs.ServiceConfigEntry{
 				Kind:        structs.ServiceDefaults,
 				Name:        "destination1",
-				Destination: &structs.DestinationConfig{Port: 9000, Address: "kafka.test.com"},
+				Destination: &structs.DestinationConfig{Port: 9000, Addresses: []string{"kafka.test.com"}},
 			}
 			return ensureConfigEntryTxn(tx, tx.Index, configEntryDest)
 		},

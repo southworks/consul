@@ -443,19 +443,23 @@ func (s *ResourceGenerator) makeDestinationClusters(cfgSnap *proxycfg.ConfigSnap
 		svcConfig, _ := serviceConfigs[svcName]
 		dest := svcConfig.Destination
 
-		// If IP, create a cluster with the fake name.
-		if dest.HasIP() {
-			opts := clusterOpts{
-				name:            connect.ServiceSNI(svcName.Name, "", svcName.NamespaceOrDefault(), svcName.PartitionOrDefault(), cfgSnap.Datacenter, cfgSnap.Roots.TrustDomain),
-				addressEndpoint: dest,
+		for _, address := range dest.Addresses {
+			// If IP, create a cluster with the fake name.
+			if structs.IsIP(address) {
+				name := getDestinationAddressSNIName(address)
+				opts := clusterOpts{
+					name:    connect.ServiceSNI(name, "", svcName.NamespaceOrDefault(), svcName.PartitionOrDefault(), cfgSnap.Datacenter, cfgSnap.Roots.TrustDomain),
+					address: address,
+					port:    dest.Port,
+				}
+				cluster := s.makeTerminatingIPCluster(cfgSnap, opts)
+				clusters = append(clusters, cluster)
+				continue
 			}
-			cluster := s.makeTerminatingIPCluster(cfgSnap, opts)
-			clusters = append(clusters, cluster)
-			continue
-		}
 
-		// TODO (dans): clusters will need to be customized later when we figure out how to manage a TLS segment from the terminating gateway to the Destination.
-		createDynamicForwardProxy = true
+			// TODO (dans): clusters will need to be customized later when we figure out how to manage a TLS segment from the terminating gateway to the Destination.
+			createDynamicForwardProxy = true
+		}
 	}
 
 	if createDynamicForwardProxy {
@@ -1106,8 +1110,9 @@ type clusterOpts struct {
 	// hostnameEndpoints is a list of endpoints with a hostname as their address
 	hostnameEndpoints structs.CheckServiceNodes
 
-	// addressEndpoint is a singular ip/port endpoint
-	addressEndpoint structs.DestinationConfig
+	// Corresponds to a valid ip/port in a Destination
+	address string
+	port    int
 }
 
 // makeGatewayCluster creates an Envoy cluster for a mesh or terminating gateway
@@ -1259,7 +1264,7 @@ func (s *ResourceGenerator) makeTerminatingIPCluster(snap *proxycfg.ConfigSnapsh
 	cluster.ClusterDiscoveryType = &discoveryType
 
 	endpoints := []*envoy_endpoint_v3.LbEndpoint{
-		makeEndpoint(opts.addressEndpoint.Address, opts.addressEndpoint.Port),
+		makeEndpoint(opts.address, opts.port),
 	}
 
 	cluster.LoadAssignment = &envoy_endpoint_v3.ClusterLoadAssignment{

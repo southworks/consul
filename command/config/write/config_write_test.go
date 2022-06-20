@@ -811,7 +811,7 @@ func TestParseConfigEntry(t *testing.T) {
 					dialed_directly = true
 				}
 				destination = {
-					address = "10.0.0.0/16",
+					addresses = ["10.0.0.1"],
 					port = 443
 				}
 			`,
@@ -832,7 +832,7 @@ func TestParseConfigEntry(t *testing.T) {
 					dialed_directly = true
 				}
 				Destination = {
-					Address = "10.0.0.0/16",
+					Addresses = ["10.0.0.1"],
 					Port = 443
 				}
 			`,
@@ -854,7 +854,7 @@ func TestParseConfigEntry(t *testing.T) {
 					"dialed_directly": true
 				},
 				"destination": {
-					"address": "10.0.0.0/16",
+					"addresses": ["10.0.0.1"],
 					"port": 443
 				}
 			}
@@ -877,7 +877,7 @@ func TestParseConfigEntry(t *testing.T) {
 					"DialedDirectly": true
 				},
 				"Destination": {
-					"Address": "10.0.0.0/16",
+					"Addresses": ["10.0.0.1"],
 					"Port": 443
 				}
 			}
@@ -899,8 +899,8 @@ func TestParseConfigEntry(t *testing.T) {
 					DialedDirectly:       true,
 				},
 				Destination: &api.DestinationConfig{
-					Address: "10.0.0.0/16",
-					Port:    443,
+					Addresses: []string{"10.0.0.1"},
+					Port:      443,
 				},
 			},
 		},
