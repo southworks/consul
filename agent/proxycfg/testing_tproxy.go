@@ -522,3 +522,69 @@ func TestConfigSnapshotTransparentProxyTerminatingGatewayCatalogDestinationsOnly
 		},
 	})
 }
+
+func TestConfigSnapshotTransparentProxyDestination(t testing.T) *ConfigSnapshot {
+	// DiscoveryChain without an UpstreamConfig should yield a
+	// filter chain when in transparent proxy mode
+	var (
+		google    = structs.NewServiceName("google", nil)
+		googleUID = NewUpstreamIDFromServiceName(google)
+		googleCE  = structs.ServiceConfigEntry{Name: "google", Destination: &structs.DestinationConfig{Address: "www.google.com", Port: 443}}
+
+		kafka    = structs.NewServiceName("kafka", nil)
+		kafkaUID = NewUpstreamIDFromServiceName(kafka)
+		kafkaCE  = structs.ServiceConfigEntry{Name: "kafka", Destination: &structs.DestinationConfig{Address: "192.168.2.1", Port: 9093}}
+	)
+
+	return TestConfigSnapshot(t, func(ns *structs.NodeService) {
+		ns.Proxy.Mode = structs.ProxyModeTransparent
+	}, []UpdateEvent{
+		{
+			CorrelationID: meshConfigEntryID,
+			Result: &structs.ConfigEntryResponse{
+				Entry: &structs.MeshConfigEntry{
+					TransparentProxy: structs.TransparentProxyMeshConfig{
+						MeshDestinationsOnly: true,
+					},
+				},
+			},
+		},
+		{
+			CorrelationID: intentionUpstreamsDestinationID,
+			Result: &structs.IndexedServiceList{
+				Services: structs.ServiceList{
+					google,
+					kafka,
+				},
+			},
+		},
+		{
+			CorrelationID: DestinationConfigEntryID + googleUID.String(),
+			Result: &structs.ConfigEntryResponse{
+				Entry: &googleCE,
+			},
+		},
+		{
+			CorrelationID: DestinationConfigEntryID + kafkaUID.String(),
+			Result: &structs.ConfigEntryResponse{
+				Entry: &kafkaCE,
+			},
+		},
+		{
+			CorrelationID: DestinationGatewayID + googleUID.String(),
+			Result: &structs.IndexedServiceNodes{
+				ServiceNodes: []*structs.ServiceNode{
+					{Node: "node1", ServiceName: "tgtw1", ServiceKind: structs.ServiceKindTerminatingGateway, ServiceTaggedAddresses: map[string]structs.ServiceAddress{structs.TaggedAddressLANIPv4: {Address: "172.168.0.1", Port: 8443}}},
+				},
+			},
+		},
+		{
+			CorrelationID: DestinationGatewayID + kafkaUID.String(),
+			Result: &structs.IndexedServiceNodes{
+				ServiceNodes: []*structs.ServiceNode{
+					{Node: "node1", ServiceName: "tgtw1", ServiceKind: structs.ServiceKindTerminatingGateway, ServiceTaggedAddresses: map[string]structs.ServiceAddress{structs.TaggedAddressLANIPv4: {Address: "172.168.0.1", Port: 8443}}},
+				},
+			},
+		},
+	})
+}

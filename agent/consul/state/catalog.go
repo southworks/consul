@@ -2879,6 +2879,50 @@ func (s *Store) GatewayServices(ws memdb.WatchSet, gateway string, entMeta *acl.
 	return lib.MaxUint64(maxIdx, idx), results, nil
 }
 
+// ServiceGateways is used to query all gateways associated with a service
+func (s *Store) ServiceGateways(ws memdb.WatchSet, service string, entMeta *acl.EnterpriseMeta, peerName string) (uint64, structs.ServiceNodes, error) {
+	var results structs.ServiceNodes
+
+	tx := s.db.Txn(false)
+	defer tx.Abort()
+
+	iter, err := tx.Get(tableGatewayServices, indexService, structs.NewServiceName(service, entMeta))
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed gateway services lookup: %s", err)
+	}
+	ws.Add(iter.WatchCh())
+
+	for obj := iter.Next(); obj != nil; obj = iter.Next() {
+		gs := obj.(*structs.GatewayService)
+		q := Query{
+			Value:          gs.Gateway.Name,
+			EnterpriseMeta: gs.Gateway.EnterpriseMeta,
+			PeerName:       peerName,
+		}
+		iterService, err := tx.Get(tableServices, indexService, q)
+
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed gateway services lookup: %s", err)
+		}
+		for s := iterService.Next(); s != nil; s = iterService.Next() {
+			gatewayService := s.(*structs.ServiceNode)
+			results = append(results, gatewayService)
+		}
+
+	}
+	meta := structs.DefaultEnterpriseMetaInDefaultPartition()
+	if entMeta != nil {
+		meta = entMeta
+	}
+	results, err = parseServiceNodes(tx, ws, results, meta, peerName)
+	if err != nil {
+		return 0, nil, err
+	}
+	idx := maxIndexTxn(tx, tableGatewayServices)
+
+	return idx, results, nil
+}
+
 func (s *Store) VirtualIPForService(sn structs.ServiceName) (string, error) {
 	tx := s.db.Txn(false)
 	defer tx.Abort()

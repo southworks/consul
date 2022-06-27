@@ -432,7 +432,7 @@ func TestConfigSnapshotTerminatingGatewayDestinations(t testing.T, populateDesti
 					Mode:        structs.ProxyModeTransparent,
 					ProxyConfig: map[string]interface{}{"protocol": "tcp"},
 					Destination: structs.DestinationConfig{
-						Address: "*.hashicorp.com",
+						Address: "api.hashicorp.com",
 						Port:    8089,
 					},
 				},

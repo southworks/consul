@@ -14,7 +14,7 @@
         {
           "filterChainMatch": {
             "serverNames": [
-              "*.hashicorp.com"
+              "external-IP-TCP.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul"
             ]
           },
           "filters": [
@@ -29,21 +29,11 @@
               }
             },
             {
-              "name": "envoy.filters.network.sni_dynamic_forward_proxy",
-              "typedConfig": {
-                "@type": "type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig",
-                "dnsCacheConfig": {
-                  "name": "dynamic_forward_proxy_cache_config"
-                },
-                "portValue": 8089
-              }
-            },
-            {
               "name": "envoy.filters.network.tcp_proxy",
               "typedConfig": {
                 "@type": "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy",
-                "statPrefix": "upstream.external-hostname-TCP.default.default.dc1",
-                "cluster": "dynamic_forward_proxy_cluster"
+                "statPrefix": "upstream.external-IP-TCP.default.default.dc1",
+                "cluster": "external-IP-TCP.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul"
               }
             }
           ],
@@ -78,7 +68,7 @@
         {
           "filterChainMatch": {
             "serverNames": [
-              "external-IP-TCP.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul"
+              "external-hostname-TCP.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul"
             ]
           },
           "filters": [
@@ -96,8 +86,8 @@
               "name": "envoy.filters.network.tcp_proxy",
               "typedConfig": {
                 "@type": "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy",
-                "statPrefix": "upstream.external-IP-TCP.default.default.dc1",
-                "cluster": "external-IP-TCP.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul"
+                "statPrefix": "upstream.external-hostname-TCP.default.default.dc1",
+                "cluster": "external-hostname-TCP.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul"
               }
             }
           ],

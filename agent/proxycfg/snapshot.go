@@ -3,6 +3,7 @@ package proxycfg
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/go-hclog"
 	"sort"
 	"strings"
 
@@ -137,8 +138,12 @@ type configSnapshotConnectProxy struct {
 	// NOTE: Intentions stores a list of lists as returned by the Intentions
 	// Match RPC. So far we only use the first list as the list of matching
 	// intentions.
-	Intentions    structs.Intentions
-	IntentionsSet bool
+	Intentions                  structs.Intentions
+	IntentionsSet               bool
+	DestinationsUpstream        map[UpstreamID]structs.ConfigEntry
+	WatchedDestinationsUpstream map[UpstreamID]context.CancelFunc
+	DestinationGateways         map[UpstreamID]structs.ServiceNodes
+	WatchedDestinationGateways  map[UpstreamID]context.CancelFunc
 }
 
 // isEmpty is a test helper
@@ -579,6 +584,7 @@ type ConfigSnapshot struct {
 
 	// ingress-gateway specific
 	IngressGateway configSnapshotIngressGateway
+	Logger         hclog.Logger
 }
 
 // Valid returns whether or not the snapshot has all required fields filled yet.
