@@ -6,6 +6,8 @@ on:
     branches:
       # Push events on the main branch
       - main
+      - windowstests/docker/support-windows-consul-dev
+      - qa
 
 env:
   PKG_NAME: consul
@@ -79,6 +81,8 @@ jobs:
           - {go: "1.18.1", goos: "windows", goarch: "386"}
           - {go: "1.18.1", goos: "windows", goarch: "amd64"}
           - {go: "1.18.1", goos: "solaris", goarch: "amd64"}
+          - {go: "1.12.0", goos: "windows", goarch: "386"}
+          - {go: "1.12.0", goos: "windows", goarch: "amd64"}
       fail-fast: true
 
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} build
