@@ -60,13 +60,14 @@ fi
 # If the user is trying to run Consul directly with some arguments, then
 # pass them to Consul.
 if [ "${1:0:1}" = '-' ]; then
-  set -- consul "$@"
+  set -- consul.exe "$@"
 fi
 
 # Look for Consul subcommands.
 if [ "$1" = 'agent' ]; then
+echo "=================================================================="
   shift
-  set -- consul agent \
+  set -- consul.exe agent \
     -data-dir="$CONSUL_DATA_DIR" \
     -config-dir="$CONSUL_CONFIG_DIR" \
     $CONSUL_BIND \
@@ -74,32 +75,24 @@ if [ "$1" = 'agent' ]; then
     "$@"
 elif [ "$1" = 'version' ]; then
   # This needs a special case because there's no help output.
-  set -- consul "$@"
-elif consul --help "$1" 2>&1 | grep -q "consul $1"; then
+  set -- consul.exe "$@"
+elif consul.exe --help "$1" 2>&1 | grep -q "consul.exe $1"; then
   # We can't use the return code to check for the existence of a subcommand, so
   # we have to use grep to look for a pattern in the help output.
-  set -- consul "$@"
+  set -- consul.exe "$@"
 fi
 
 # If we are running Consul, make sure it executes as the proper user.
 if [ "$1" = 'consul' -a -z "${CONSUL_DISABLE_PERM_MGMT+x}" ]; then
-  # Allow to setup user and group via envrironment
-  if [ -z "$CONSUL_UID" ]; then
-    CONSUL_UID="$(id -u consul)"
-  fi
-
-  if [ -z "$CONSUL_GID" ]; then
-    CONSUL_GID="$(id -g consul)"
-  fi
-
+  
   # If the data or config dirs are bind mounted then chown them.
   # Note: This checks for root ownership as that's the most common case.
-  if [ "$(stat -c %u "$CONSUL_DATA_DIR")" != "${CONSUL_UID}" ]; then
-    chown ${CONSUL_UID}:${CONSUL_GID} "$CONSUL_DATA_DIR"
-  fi
-  if [ "$(stat -c %u "$CONSUL_CONFIG_DIR")" != "${CONSUL_UID}" ]; then
-    chown ${CONSUL_UID}:${CONSUL_GID} "$CONSUL_CONFIG_DIR"
-  fi
+  # if [ "$(stat -c %u "$CONSUL_DATA_DIR")" != "${CONSUL_UID}" ]; then
+  #   chown ${CONSUL_UID}:${CONSUL_GID} "$CONSUL_DATA_DIR"
+  # fi
+  # if [ "$(stat -c %u "$CONSUL_CONFIG_DIR")" != "${CONSUL_UID}" ]; then
+  #   chown ${CONSUL_UID}:${CONSUL_GID} "$CONSUL_CONFIG_DIR"
+  # fi
 
   # If requested, set the capability to bind to privileged ports before
   # we drop to the non-root user. Note that this doesn't work with all
@@ -108,7 +101,9 @@ if [ "$1" = 'consul' -a -z "${CONSUL_DISABLE_PERM_MGMT+x}" ]; then
     setcap "cap_net_bind_service=+ep" /bin/consul
   fi
 
-  set -- su-exec ${CONSUL_UID}:${CONSUL_GID} "$@"
-fi
+  # set -- su-exec ${CONSUL_UID}:${CONSUL_GID} "$@"
 
+fi
+echo "------------------------"
+echo $@
 exec "$@"

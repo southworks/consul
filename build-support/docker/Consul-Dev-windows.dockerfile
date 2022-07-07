@@ -1,6 +1,11 @@
 ARG CONSUL_IMAGE_VERSION=1.12.0
 FROM mcr.microsoft.com/windows/servercore:1809
 
+RUN ["powershell", "Set-ExecutionPolicy", "Bypass", "-Scope", "Process", "-Force;"]
+RUN ["powershell", "iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))"]
+
+RUN choco install git.install -yf
+
 RUN mkdir C:\\consul
 RUN mkdir -p C:\\consul\\data
 RUN mkdir -p C:\\consul\\config
@@ -17,10 +22,8 @@ ENV CONSUL_URL=https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${
 RUN curl %CONSUL_URL% -L -o consul.zip
 RUN tar -xf consul.zip -C consul
 
-ENV PATH C:\\consul;%PATH%
+ENV PATH C:\\Program Files\\Git\\bin;C:\\consul;%PATH%
 
 COPY .release\docker\docker-entrypoint-windows.sh C:
 
-# TODO Comment out until you have a working docker-entrypoint-windows.sh
-# ENTRYPOINT ["docker-entrypoint-windows.sh"]
-# CMD ["agent" "-dev" "-client" "0.0.0.0"]
+ENTRYPOINT ["bash.exe", "C:\\docker-entrypoint-windows.sh"]
