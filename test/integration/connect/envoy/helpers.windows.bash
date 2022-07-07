@@ -575,7 +575,7 @@ function docker_consul_for_proxy_bootstrap {
 function docker_wget {
   local DC=$1
   shift 1
-  docker.exe run --rm --network container:envoy_consul-${DC}_1 docker.mirror.hashicorp.services/windows/nanoserver:latest curl "$@"
+  docker.exe run --rm --network container:envoy_consul-${DC}_1 docker.mirror.hashicorp.services/windows/nanoserver curl "$@"
 }
 
 function docker_curl {
