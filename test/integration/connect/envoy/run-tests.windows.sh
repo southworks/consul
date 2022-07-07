@@ -37,7 +37,6 @@ function command_error {
 }
 
 trap 'command_error $? "${BASH_COMMAND}" "${LINENO}" "${FUNCNAME[0]:-main}" "${BASH_SOURCE[0]}:${BASH_LINENO[0]}"' ERR
-# TODO
 readonly WORKDIR_SNIPPET='-v envoy_workdir:/workdir'
 
 function network_snippet {
@@ -296,7 +295,7 @@ function pre_service_setup {
 function start_services {
   # Push the state to the shared docker volume (note this is because CircleCI
   # can't use shared volumes)
- docker.exe cp workdir/. envoy_workdir_1:/workdir
+  docker.exe cp workdir/. envoy_workdir_1:/workdir
 
   # Start containers required
   if [ ! -z "$REQUIRED_SERVICES" ] ; then
@@ -416,7 +415,6 @@ function wipe_volumes {
   docker.exe run --rm -i \
     $WORKDIR_SNIPPET \
     --net=none \
-    # TODO: Temporary change, until HashiCorp updates HASHICORP_DOCKER_PROXY.
     "${HASHICORP_DOCKER_PROXY}/windows/nanoserver" \
     rd /s /q "C:\\workdir"
 }
@@ -597,7 +595,7 @@ function common_run_container_service {
 
   docker.exe run -d --name $(container_name_prev) \
     -e "FORTIO_NAME=${service}" \
-    $(network_snippet $CLUSTER) \    
+    $(network_snippet $CLUSTER) \
    "${HASHICORP_DOCKER_PROXY}/windows/fortio" \
     server \
     -http-port ":$httpPort" \
@@ -796,7 +794,6 @@ function run_container_fake-statsd {
     SYSTEM:'xargs -0 echo >> /workdir/primary/statsd/statsd.log'
 }
 
-# TODO
 #https://hub.docker.com/r/openzipkin/zipkin-base
 function run_container_zipkin {
   docker.exe run -d --name $(container_name) \
@@ -804,7 +801,6 @@ function run_container_zipkin {
     $(network_snippet primary) \
     "${HASHICORP_DOCKER_PROXY}/openzipkin/zipkin"
 }
-# TODO
 function run_container_jaeger {
   docker.exe run -d --name $(container_name) \
     $WORKDIR_SNIPPET \
@@ -854,7 +850,6 @@ function common_run_container_tcpdump {
     local DC="$1"
 
     # we cant run this in circle but its only here to temporarily enable.
-    # TODO
     docker.exe build -t envoy-tcpdump -f Dockerfile-tcpdump-windows .
 
     docker.exe run -d --name $(container_name_prev) \
