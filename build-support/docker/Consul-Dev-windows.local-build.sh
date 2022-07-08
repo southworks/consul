@@ -10,3 +10,5 @@ GOLDFLAGS=" -X $GIT_IMPORT.GitCommit=$GIT_COMMIT$GIT_DIRTY -X $GIT_IMPORT.BuildD
 go build -ldflags "$GOLDFLAGS" -o dist/ .
 
 docker build -t consul-dev -f ./build-support/docker/Consul-Dev-windows.local.dockerfile .
+
+
