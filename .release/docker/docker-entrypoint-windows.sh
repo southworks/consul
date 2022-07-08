@@ -60,12 +60,11 @@ fi
 # If the user is trying to run Consul directly with some arguments, then
 # pass them to Consul.
 if [ "${1:0:1}" = '-' ]; then
-  set -- consul.exe "$@"
+  set -- "$@"
 fi
 
 # Look for Consul subcommands.
 if [ "$1" = 'agent' ]; then
-echo "=================================================================="
   shift
   set -- consul.exe agent \
     -data-dir="$CONSUL_DATA_DIR" \
@@ -75,11 +74,11 @@ echo "=================================================================="
     "$@"
 elif [ "$1" = 'version' ]; then
   # This needs a special case because there's no help output.
-  set -- consul.exe "$@"
+  set -- "$@"
 elif consul.exe --help "$1" 2>&1 | grep -q "consul.exe $1"; then
   # We can't use the return code to check for the existence of a subcommand, so
   # we have to use grep to look for a pattern in the help output.
-  set -- consul.exe "$@"
+  set -- "$@"
 fi
 
 # If we are running Consul, make sure it executes as the proper user.
@@ -104,6 +103,4 @@ if [ "$1" = 'consul' -a -z "${CONSUL_DISABLE_PERM_MGMT+x}" ]; then
   # set -- su-exec ${CONSUL_UID}:${CONSUL_GID} "$@"
 
 fi
-echo "------------------------"
-echo $@
-exec "$@"
+consul.exe $@

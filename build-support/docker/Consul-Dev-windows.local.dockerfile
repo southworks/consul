@@ -19,8 +19,7 @@ ENV PATH C:\\Program Files\\Git\\bin;C:\\consul;%PATH%
 
 COPY .release/docker/docker-entrypoint-windows.sh C: 
 
-ENTRYPOINT ["bash.exe", "C:\\docker-entrypoint-windows.sh"]
-
-# TODO Comment out until you have a working in Windows
+# TODO - It is left commented until the end of the task to update the entrypoint to work with Windows
+# ENTRYPOINT ["bash.exe", "C:\\docker-entrypoint-windows.sh"]
 # CMD ["agent" "-dev" "-client" "0.0.0.0"]
 

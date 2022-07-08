@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
+export GOOS=windows GOARCH=amd64
 
-
-# Get the git commit
 GIT_COMMIT=$(git rev-parse --short HEAD)
 GIT_DIRTY=$(test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_IMPORT=github.com/hashicorp/consul/version
