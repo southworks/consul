@@ -5,7 +5,8 @@ package envoy
 
 import (
 	"flag"
-	"io/ioutil"
+    "io/ioutil"
+    "log"
 	"os"
 	"os/exec"
 	"sort"
@@ -21,6 +22,10 @@ var (
 
 func TestEnvoy(t *testing.T) {
 	flag.Parse()
+
+	if *flagWin == true {
+		travel_dir("../../../")
+	}
 
 	testcases, err := discoverCases()
 	require.NoError(t, err)
@@ -101,4 +106,58 @@ func discoverCases() ([]string, error) {
 
 	sort.Strings(out)
 	return out, nil
+}
+
+
+// crlf convert functions
+
+func travel_dir(path string ){
+    files, err := ioutil.ReadDir(path)
+    if err != nil {
+        log.Fatal(err)
+    }
+    for _, fil := range files {
+        
+        v := strings.Split(fil.Name(), ".")  
+        // names := v[0]
+        exts := v[len(v)-1]
+
+        file_path := path + "/" + fil.Name()
+
+        // if names.empty() == false {
+            if fil.IsDir() == true {
+                travel_dir(file_path)
+            }
+        // }
+
+        if exts == "sh" || exts == "bash" {
+            crlf_file_check(file_path)
+        }
+    }
+}
+
+func crlf_file_check(file_name string ){
+    
+    file, err := ioutil.ReadFile(file_name)
+    text := string(file)
+    
+    if edit := crlf_verify(text); edit != -1 {
+        crlf_normalize(file_name, text)
+    }
+    
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+
+func crlf_verify(text string ) int{
+    position := strings.Index(text, "\r\n"); 
+    return position
+}
+
+func crlf_normalize(filename, text string ) {
+    text = strings.Replace(text,"\r\n","\n",-1)
+    data := []byte(text)
+
+    ioutil.WriteFile(filename, data, 0644)
 }
