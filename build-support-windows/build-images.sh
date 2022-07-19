@@ -32,4 +32,7 @@ docker build -t "${HASHICORP_DOCKER_PROXY}/windows/fortio" -f Dockerfile-fortio-
 # Build Windows Socat Image
 docker build -t "${HASHICORP_DOCKER_PROXY}/windows/socat" -f Dockerfile-socat-windows .
 
+# Buiild Windows Jaeger Image
+docker build -t "${HASHICORP_DOCKER_PROXY}/windows/socat" -f Dockerfile-jaeger-windows .
+
 echo "Building Complete!"
