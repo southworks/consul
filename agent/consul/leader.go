@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/consul/acl"
 	"github.com/hashicorp/consul/agent/metadata"
 	"github.com/hashicorp/consul/agent/structs"
+	"github.com/hashicorp/consul/agent/structs/aclfilter"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/lib"
 	"github.com/hashicorp/consul/logging"
@@ -385,7 +386,7 @@ func (s *Server) initializeACLs(ctx context.Context) error {
 
 	// Remove any token affected by CVE-2019-8336
 	if !s.InPrimaryDatacenter() {
-		_, token, err := s.fsm.State().ACLTokenGetBySecret(nil, redactedToken, nil)
+		_, token, err := s.fsm.State().ACLTokenGetBySecret(nil, aclfilter.RedactedToken, nil)
 		if err == nil && token != nil {
 			req := structs.ACLTokenBatchDeleteRequest{
 				TokenIDs: []string{token.AccessorID},
@@ -1066,6 +1067,11 @@ func (s *Server) handleAliveMember(member serf.Member, nodeEntMeta *acl.Enterpri
 				"serf_protocol_max":     strconv.FormatUint(uint64(member.ProtocolMax), 10),
 				"version":               parts.Build.String(),
 			},
+		}
+
+		grpcPortStr := member.Tags["grpc_port"]
+		if v, err := strconv.Atoi(grpcPortStr); err == nil && v > 0 {
+			service.Meta["grpc_port"] = grpcPortStr
 		}
 
 		// Attempt to join the consul server

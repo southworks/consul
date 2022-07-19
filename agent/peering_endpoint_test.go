@@ -107,7 +107,7 @@ func TestHTTP_Peering_GenerateToken(t *testing.T) {
 		require.NoError(t, json.Unmarshal(tokenJSON, &token))
 
 		require.Nil(t, token.CA)
-		require.Equal(t, []string{fmt.Sprintf("127.0.0.1:%d", a.config.ServerPort)}, token.ServerAddresses)
+		require.Equal(t, []string{fmt.Sprintf("127.0.0.1:%d", a.config.GRPCPort)}, token.ServerAddresses)
 		require.Equal(t, "server.dc1.consul", token.ServerName)
 
 		// The PeerID in the token is randomly generated so we don't assert on its value.
@@ -217,7 +217,7 @@ func TestHTTP_Peering_MethodNotAllowed(t *testing.T) {
 	foo := &pbpeering.PeeringWriteRequest{
 		Peering: &pbpeering.Peering{
 			Name:                "foo",
-			State:               pbpeering.PeeringState_INITIAL,
+			State:               pbpeering.PeeringState_ESTABLISHING,
 			PeerCAPems:          nil,
 			PeerServerName:      "fooservername",
 			PeerServerAddresses: []string{"addr1"},
@@ -252,7 +252,7 @@ func TestHTTP_Peering_Read(t *testing.T) {
 	foo := &pbpeering.PeeringWriteRequest{
 		Peering: &pbpeering.Peering{
 			Name:                "foo",
-			State:               pbpeering.PeeringState_INITIAL,
+			State:               pbpeering.PeeringState_ESTABLISHING,
 			PeerCAPems:          nil,
 			PeerServerName:      "fooservername",
 			PeerServerAddresses: []string{"addr1"},
@@ -285,6 +285,10 @@ func TestHTTP_Peering_Read(t *testing.T) {
 
 		require.Equal(t, foo.Peering.Name, apiResp.Name)
 		require.Equal(t, foo.Peering.Meta, apiResp.Meta)
+
+		require.Equal(t, uint64(0), apiResp.ImportedServiceCount)
+		require.Equal(t, uint64(0), apiResp.ExportedServiceCount)
+
 	})
 
 	t.Run("not found", func(t *testing.T) {
@@ -313,7 +317,7 @@ func TestHTTP_Peering_Delete(t *testing.T) {
 	foo := &pbpeering.PeeringWriteRequest{
 		Peering: &pbpeering.Peering{
 			Name:                "foo",
-			State:               pbpeering.PeeringState_INITIAL,
+			State:               pbpeering.PeeringState_ESTABLISHING,
 			PeerCAPems:          nil,
 			PeerServerName:      "fooservername",
 			PeerServerAddresses: []string{"addr1"},
@@ -383,7 +387,7 @@ func TestHTTP_Peering_List(t *testing.T) {
 	foo := &pbpeering.PeeringWriteRequest{
 		Peering: &pbpeering.Peering{
 			Name:                "foo",
-			State:               pbpeering.PeeringState_INITIAL,
+			State:               pbpeering.PeeringState_ESTABLISHING,
 			PeerCAPems:          nil,
 			PeerServerName:      "fooservername",
 			PeerServerAddresses: []string{"addr1"},
@@ -414,5 +418,10 @@ func TestHTTP_Peering_List(t *testing.T) {
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&apiResp))
 
 		require.Len(t, apiResp, 2)
+
+		for _, p := range apiResp {
+			require.Equal(t, uint64(0), p.ImportedServiceCount)
+			require.Equal(t, uint64(0), p.ExportedServiceCount)
+		}
 	})
 }

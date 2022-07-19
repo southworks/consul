@@ -16,6 +16,16 @@
       "partition": "default"
     }
   },
+  "layered_runtime": {
+    "layers": [
+      {
+        "name": "base",
+        "static_layer": {
+          "re2.max_program_size.error_level": 1048576
+        }
+      }
+    ]
+  },
   "static_resources": {
     "clusters": [
       {
@@ -141,9 +151,7 @@
                     }
                   ],
                   "validationContextSdsSecretConfig": {
-                    "trustedCa": {
-                      "name": "prometheus_validation_context"
-                    }
+                    "name": "prometheus_validation_context"
                   }
                 }
               }

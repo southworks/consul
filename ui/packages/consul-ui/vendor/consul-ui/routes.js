@@ -34,14 +34,6 @@
           },
         },
       },
-      peers: {
-        _options: { path: '/peers' },
-        index: {
-          _options: {
-            path: '/',
-          },
-        },
-      },
       services: {
         _options: { path: '/services' },
         index: {
@@ -54,7 +46,7 @@
               kind: 'kind',
               searchproperty: {
                 as: 'searchproperty',
-                empty: [['Name', 'Tags', 'PeerName']],
+                empty: [['Partition', 'Name', 'Tags', 'PeerName']],
               },
               search: {
                 as: 'filter',
