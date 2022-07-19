@@ -7,7 +7,7 @@
 - [Dockerfile-bats-core-windows](#dockerfile-bats-core-windows)
 - [Dockerfile-consul-dev-windows](#dockerfile-consul-dev-windows)
 - [Dockerfile-fortio-windows](#dockerfile-fortio-windows)
-- [Dockerfile-jaeger-windows](#dockerfile-jaeger-windows)
+- [Dockerfile-jaegertracing-windows](#dockerfile-jaegertracing-windows)
 - [Dockerfile-socat-windows](#dockerfile-socat-windows)
 - [Build images](#build-images)
 
@@ -98,29 +98,21 @@ You can test the built file by running the following command:
 docker run --rm -p 8080:8080 --name fortio fortio
 ```
 
-If everything works properly you should openning the browser and check that the Fortio server running on: `http://localhost:8080/fortio`
+If everything works properly you should opening the browser and check that the Fortio server running on: `http://localhost:8080/fortio`
 
-## Dockerfile-jaeger-windows
+## Dockerfile-jaegertracing-windows
 
 The all-in-one image was replaced by a [windows/servercore image](https://hub.docker.com/_/microsoft-windows-servercore) image, where we download the official jaegertracing binaries for Windows. Then we replicate everything that is being done in the all-in-one Docker image available for Linux.
 To build this image you need to run the following command on your terminal:
 
 ```shell
-docker build -t jaeger -f Dockerfile-jaeger-windows .
-```
-
-## Build images
-
-To build the images, it is necessary to open a Git bash terminal and run
-
-```shell
-./build-images.sh
+docker build -t jaegertracing -f Dockerfile-jaegertracing-windows .
 ```
 
 You can test the built file by running the following command:
 
 ```shell
-docker run --rm --name jaeger version
+docker run --rm --name jaegertracing version
 ```
 
 If everything works properly you should get the following output:
@@ -153,6 +145,14 @@ If everything works properly you should get the following output:
 
 ```shell
 20XX/XX/XX XX:XX:XX socat[1292] E exactly 2 addresses required (there are 0); use option "-h" for help
+```
+
+## Build images
+
+To build the images, it is necessary to open a Git bash terminal and run
+
+```shell
+./build-images.sh
 ```
 
 ---
