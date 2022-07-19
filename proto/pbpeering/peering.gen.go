@@ -10,6 +10,7 @@ func EstablishRequestToAPI(s *EstablishRequest, t *api.PeeringEstablishRequest) 
 	}
 	t.PeerName = s.PeerName
 	t.PeeringToken = s.PeeringToken
+	t.Partition = s.Partition
 	t.Datacenter = s.Datacenter
 	t.Token = s.Token
 	t.Meta = s.Meta
@@ -20,6 +21,7 @@ func EstablishRequestFromAPI(t *api.PeeringEstablishRequest, s *EstablishRequest
 	}
 	s.PeerName = t.PeerName
 	s.PeeringToken = t.PeeringToken
+	s.Partition = t.Partition
 	s.Datacenter = t.Datacenter
 	s.Token = t.Token
 	s.Meta = t.Meta
@@ -80,6 +82,8 @@ func PeeringToAPI(s *Peering, t *api.Peering) {
 	t.PeerCAPems = s.PeerCAPems
 	t.PeerServerName = s.PeerServerName
 	t.PeerServerAddresses = s.PeerServerAddresses
+	t.ImportedServiceCount = s.ImportedServiceCount
+	t.ExportedServiceCount = s.ExportedServiceCount
 	t.CreateIndex = s.CreateIndex
 	t.ModifyIndex = s.ModifyIndex
 }
@@ -97,6 +101,8 @@ func PeeringFromAPI(t *api.Peering, s *Peering) {
 	s.PeerCAPems = t.PeerCAPems
 	s.PeerServerName = t.PeerServerName
 	s.PeerServerAddresses = t.PeerServerAddresses
+	s.ImportedServiceCount = t.ImportedServiceCount
+	s.ExportedServiceCount = t.ExportedServiceCount
 	s.CreateIndex = t.CreateIndex
 	s.ModifyIndex = t.ModifyIndex
 }

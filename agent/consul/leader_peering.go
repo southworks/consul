@@ -6,7 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"net"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-memdb"
@@ -15,15 +15,16 @@ import (
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 
 	"github.com/hashicorp/consul/acl"
 	"github.com/hashicorp/consul/agent/consul/state"
-	"github.com/hashicorp/consul/agent/pool"
-	"github.com/hashicorp/consul/agent/rpc/peering"
+	"github.com/hashicorp/consul/agent/grpc-external/services/peerstream"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/logging"
 	"github.com/hashicorp/consul/proto/pbpeering"
+	"github.com/hashicorp/consul/proto/pbpeerstream"
 )
 
 func (s *Server) startPeeringStreamSync(ctx context.Context) {
@@ -86,7 +87,7 @@ func (s *Server) syncPeeringsAndBlock(ctx context.Context, logger hclog.Logger, 
 	//   3. accept new stream for [D]
 	//   4. list peerings [A,B,C,D]
 	//   5. terminate []
-	connectedStreams := s.peeringService.ConnectedStreams()
+	connectedStreams := s.peerStreamServer.ConnectedStreams()
 
 	state := s.fsm.State()
 
@@ -132,7 +133,7 @@ func (s *Server) syncPeeringsAndBlock(ctx context.Context, logger hclog.Logger, 
 			continue
 		}
 
-		status, found := s.peeringService.StreamStatus(peer.ID)
+		status, found := s.peerStreamServer.StreamStatus(peer.ID)
 
 		// TODO(peering): If there is new peering data and a connected stream, should we tear down the stream?
 		//                If the data in the updated token is bad, the user wouldn't know until the old servers/certs become invalid.
@@ -161,7 +162,7 @@ func (s *Server) syncPeeringsAndBlock(ctx context.Context, logger hclog.Logger, 
 		}
 	}
 
-	logger.Trace("checking connected streams", "streams", s.peeringService.ConnectedStreams(), "sequence_id", seq)
+	logger.Trace("checking connected streams", "streams", s.peerStreamServer.ConnectedStreams(), "sequence_id", seq)
 
 	// Clean up active streams of peerings that were deleted from the state store.
 	// TODO(peering): This is going to trigger shutting down peerings we generated a token for. Is that OK?
@@ -226,6 +227,11 @@ func (s *Server) establishStream(ctx context.Context, logger hclog.Logger, peer 
 	retryCtx, cancel := context.WithCancel(ctx)
 	cancelFns[peer.ID] = cancel
 
+	streamStatus, err := s.peerStreamTracker.Register(peer.ID)
+	if err != nil {
+		return fmt.Errorf("failed to register stream: %v", err)
+	}
+
 	// Establish a stream-specific retry so that retrying stream/conn errors isn't dependent on state store changes.
 	go retryLoopBackoff(retryCtx, func() error {
 		// Try a new address on each iteration by advancing the ring buffer on errors.
@@ -239,33 +245,43 @@ func (s *Server) establishStream(ctx context.Context, logger hclog.Logger, peer 
 
 		logger.Trace("dialing peer", "addr", addr)
 		conn, err := grpc.DialContext(retryCtx, addr,
-			grpc.WithContextDialer(newPeerDialer(addr)),
-			grpc.WithBlock(),
+			// TODO(peering): use a grpc.WithStatsHandler here?)
 			tlsOption,
+			// For keep alive parameters there is a larger comment in ClientConnPool.dial about that.
+			grpc.WithKeepaliveParams(keepalive.ClientParameters{
+				Time:    30 * time.Second,
+				Timeout: 10 * time.Second,
+				// send keepalive pings even if there is no active streams
+				PermitWithoutStream: true,
+			}),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to dial: %w", err)
 		}
 		defer conn.Close()
 
-		client := pbpeering.NewPeeringServiceClient(conn)
+		client := pbpeerstream.NewPeerStreamServiceClient(conn)
 		stream, err := client.StreamResources(retryCtx)
 		if err != nil {
 			return err
 		}
 
-		streamReq := peering.HandleStreamRequest{
+		if peer.PeerID == "" {
+			return fmt.Errorf("expected PeerID to be non empty; the wrong end of peering is being dialed")
+		}
+
+		streamReq := peerstream.HandleStreamRequest{
 			LocalID:   peer.ID,
 			RemoteID:  peer.PeerID,
 			PeerName:  peer.Name,
 			Partition: peer.Partition,
 			Stream:    stream,
 		}
-		err = s.peeringService.HandleStream(streamReq)
+		err = s.peerStreamServer.HandleStream(streamReq)
 		// A nil error indicates that the peering was deleted and the stream needs to be gracefully shutdown.
 		if err == nil {
 			stream.CloseSend()
-			s.peeringService.DrainStream(streamReq)
+			s.peerStreamServer.DrainStream(streamReq)
 
 			// This will cancel the retry-er context, letting us break out of this loop when we want to shut down the stream.
 			cancel()
@@ -275,32 +291,11 @@ func (s *Server) establishStream(ctx context.Context, logger hclog.Logger, peer 
 		return err
 
 	}, func(err error) {
-		// TODO(peering): These errors should be reported in the peer status, otherwise they're only in the logs.
-		//                Lockable status isn't available here though. Could report it via the peering.Service?
+		streamStatus.TrackSendError(err.Error())
 		logger.Error("error managing peering stream", "peer_id", peer.ID, "error", err)
 	})
 
 	return nil
-}
-
-func newPeerDialer(peerAddr string) func(context.Context, string) (net.Conn, error) {
-	return func(ctx context.Context, addr string) (net.Conn, error) {
-		d := net.Dialer{}
-		conn, err := d.DialContext(ctx, "tcp", peerAddr)
-		if err != nil {
-			return nil, err
-		}
-
-		// TODO(peering): This is going to need to be revisited. This type uses the TLS settings configured on the agent, but
-		//                for peering we never want mutual TLS because the client peer doesn't share its CA cert.
-		_, err = conn.Write([]byte{byte(pool.RPCGRPC)})
-		if err != nil {
-			conn.Close()
-			return nil, err
-		}
-
-		return conn, nil
-	}
 }
 
 func (s *Server) startPeeringDeferredDeletion(ctx context.Context) {

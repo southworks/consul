@@ -39,7 +39,7 @@ load helpers
 }
 
 @test "gateway-alpha should have healthy endpoints for s2" {
-  assert_upstream_has_endpoints_in_status consul-alpha-client:19003 s2.default.alpha HEALTHY 1
+  assert_upstream_has_endpoints_in_status consul-alpha-client:19003 exported~s2.default.alpha HEALTHY 1
 }
 
 @test "s1 upstream should have healthy endpoints for s2" {

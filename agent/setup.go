@@ -16,9 +16,10 @@ import (
 	"github.com/hashicorp/consul/agent/config"
 	"github.com/hashicorp/consul/agent/consul"
 	"github.com/hashicorp/consul/agent/consul/fsm"
+	"github.com/hashicorp/consul/agent/consul/stream"
 	"github.com/hashicorp/consul/agent/consul/usagemetrics"
-	grpc "github.com/hashicorp/consul/agent/grpc/private"
-	"github.com/hashicorp/consul/agent/grpc/private/resolver"
+	grpc "github.com/hashicorp/consul/agent/grpc-internal"
+	"github.com/hashicorp/consul/agent/grpc-internal/resolver"
 	"github.com/hashicorp/consul/agent/local"
 	"github.com/hashicorp/consul/agent/pool"
 	"github.com/hashicorp/consul/agent/router"
@@ -146,6 +147,8 @@ func NewBaseDeps(configLoader ConfigLoader, logOut io.Writer) (BaseDeps, error) 
 
 	d.NewRequestRecorderFunc = middleware.NewRequestRecorder
 	d.GetNetRPCInterceptorFunc = middleware.GetNetRPCInterceptor
+
+	d.EventPublisher = stream.NewEventPublisher(10 * time.Second)
 
 	return d, nil
 }
