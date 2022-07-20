@@ -143,7 +143,7 @@ If everything works as it should, you will see the zipkin logo being displayed, 
 ```shell
 :: version 2.23.18 :: commit 4b71677 ::
 
-2022-07-20 11:05:45.909  INFO [/] 1252 --- [oss-http-*:9411] c.l.a.s.Server                           : Serving HTTP at /[0:0:0:0:0:0:0:0]:9411 - http://127.0.0.1:9411/
+20XX-XX-XX XX:XX:XX.XXX  INFO [/] 1252 --- [oss-http-*:9411] c.l.a.s.Server                           : Serving HTTP at /[0:0:0:0:0:0:0:0]:9411 - http://127.0.0.1:9411/
 ```
 
 ## Dockerfile-socat-windows
