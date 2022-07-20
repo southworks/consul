@@ -121,6 +121,24 @@ If everything works properly you should get the following output:
 {"gitCommit":"b5e2b65c690c3b4ed55e91f1afe1efb0570dc542","GitVersion":"v1.11.0","BuildDate":"2019-03-07T12:56:46Z"}
 ```
 
+## Dockerfile-openzipkin-windows
+
+Due to the unavailability of an official Openzipkin Docker image for Windows, the [openjdk Windows image](https://hub.docker.com/layers/openjdk/library/openjdk/jdk-windowsservercore-1809/images/sha256-b0cc238d2ec5fb58109a0006ff9e1bcaf66a5301f49bcb8dece9599ac5be6331) was used, where the latest self-contained executable Openzipkin jar is downloaded.
+
+To build this image you need to run the following command on your terminal:
+
+```shell
+docker build -t openzipkin -f Dockerfile-openzipkin-windows .
+```
+
+You can test the built file by running the following command:
+
+```shell
+docker run --rm --name openzipkin
+```
+
+If everything works as it should, you will see the zipkin logo being displayed, along with the current version and port configuration.
+
 ## Dockerfile-socat-windows
 
 The alpine:socat image was replaced by a windows core image to which a precompiled version of Socat was installed.
