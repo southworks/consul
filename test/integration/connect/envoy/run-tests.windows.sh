@@ -536,7 +536,6 @@ function suite_setup {
     suite_teardown 
 
     docker.exe network create -d "nat" --subnet "10.244.0.0/24" envoy-tests
-    docker.exe network ls
     
     # Start the volume container
     #
@@ -565,7 +564,6 @@ function suite_setup {
 
     # pre-build the consul+envoy container
     echo "Rebuilding 'consul-dev-envoy:${ENVOY_VERSION}' image..."
-    # TODO - Line below commented for testing
     docker build -t consul-dev-envoy:${ENVOY_VERSION} \
          --build-arg ENVOY_VERSION=${ENVOY_VERSION} \
          -f Dockerfile-consul-envoy-windows .
