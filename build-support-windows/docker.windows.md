@@ -7,6 +7,8 @@
 - [Dockerfile-bats-core-windows](#dockerfile-bats-core-windows)
 - [Dockerfile-consul-dev-windows](#dockerfile-consul-dev-windows)
 - [Dockerfile-fortio-windows](#dockerfile-fortio-windows)
+- [Dockerfile-jaegertracing-windows](#dockerfile-jaegertracing-windows)
+- [Dockerfile-openzipkin-windows](#dockerfile-openzipkin-windows)
 - [Dockerfile-socat-windows](#dockerfile-socat-windows)
 - [Build images](#build-images)
 
@@ -29,8 +31,8 @@ You can test the built file by running the following command:
 ```shell
 docker run --rm -p 8300:8300 -p 8301:8301 -p 8302:8302 -p 8500:8500 -p 8600:8600 --name consul --hostname "consul-primary-server" --network-alias "consul-primary-server" windows/consul agent -dev -datacenter "primary" -grpc-port -1 -client "0.0.0.0" -bind "0.0.0.0"
 ```
-If everything works properly you should openning the browser and check the Consul UI running on: `http://localhost:8500`
 
+If everything works properly you should openning the browser and check the Consul UI running on: `http://localhost:8500`
 
 ## Dockerfile-bats-core-windows
 
@@ -77,6 +79,7 @@ You can test the built file by running the following command:
 ```shell
 docker run --rm -p 8300:8300 -p 8301:8301 -p 8302:8302 -p 8500:8500 -p 8600:8600 --name consul-dev --hostname "consul-primary-server" --network-alias "consul-primary-server" windows/consul-dev agent -dev -datacenter "primary" -grpc-port -1 -client "0.0.0.0" -bind "0.0.0.0"
 ```
+
 If everything works properly you should openning the browser and check the Consul UI running on: `http://localhost:8500`
 
 ## Dockerfile-fortio-windows
@@ -96,7 +99,52 @@ You can test the built file by running the following command:
 docker run --rm -p 8080:8080 --name fortio fortio
 ```
 
-If everything works properly you should openning the browser and check that the Fortio server running on: `http://localhost:8080/fortio`
+If everything works properly you should opening the browser and check that the Fortio server running on: `http://localhost:8080/fortio`
+
+## Dockerfile-jaegertracing-windows
+
+The all-in-one image was replaced by a [windows/servercore image](https://hub.docker.com/_/microsoft-windows-servercore) image, where we download the official jaegertracing binaries for Windows. Then we replicate everything that is being done in the all-in-one Docker image available for Linux.
+To build this image you need to run the following command on your terminal:
+
+```shell
+docker build -t jaegertracing -f Dockerfile-jaegertracing-windows .
+```
+
+You can test the built file by running the following command:
+
+```shell
+docker run --rm --name jaegertracing version
+```
+
+If everything works properly you should get the following output:
+
+```shell
+{"gitCommit":"b5e2b65c690c3b4ed55e91f1afe1efb0570dc542","GitVersion":"v1.11.0","BuildDate":"2019-03-07T12:56:46Z"}
+```
+
+## Dockerfile-openzipkin-windows
+
+Due to the unavailability of an official Openzipkin Docker image for Windows, the [openjdk Windows image](https://hub.docker.com/layers/openjdk/library/openjdk/jdk-windowsservercore-1809/images/sha256-b0cc238d2ec5fb58109a0006ff9e1bcaf66a5301f49bcb8dece9599ac5be6331) was used, where the latest self-contained executable Openzipkin jar is downloaded.
+
+To build this image you need to run the following command on your terminal:
+
+```shell
+docker build -t openzipkin -f Dockerfile-openzipkin-windows .
+```
+
+You can test the built file by running the following command:
+
+```shell
+docker run --rm --name openzipkin
+```
+
+If everything works as it should, you will see the zipkin logo being displayed, along with the current version and port configuration:
+
+```shell
+:: version 2.23.18 :: commit 4b71677 ::
+
+20XX-XX-XX XX:XX:XX.XXX  INFO [/] 1252 --- [oss-http-*:9411] c.l.a.s.Server                           : Serving HTTP at /[0:0:0:0:0:0:0:0]:9411 - http://127.0.0.1:9411/
+```
 
 ## Dockerfile-socat-windows
 
@@ -133,6 +181,7 @@ To build the images, it is necessary to open a Git bash terminal and run
 ```
 
 ---
+
 # Testing
 
 During development, it may be more convenient to check your work-in-progress by running only the tests which you expect to be affected by your changes, as the full test suite can take several minutes to execute. [Go's built-in test tool](https://golang.org/pkg/cmd/go/internal/test/) allows specifying a list of packages to test and the `-run` option to only include test names matching a regular expression.
@@ -152,4 +201,3 @@ Example:
 ```shell
 go test -v -timeout=30m -tags integration ./test/integration/connect/envoy -run="TestEnvoy/case-badauthz" -win=true
 ```
-
