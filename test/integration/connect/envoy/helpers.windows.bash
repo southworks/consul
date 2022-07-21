@@ -581,7 +581,9 @@ function docker_wget {
 function docker_curl {
   local DC=$1
   shift 1
-  docker.exe run --rm --network envoy-tests --entrypoint curl windows/consul-dev "$@"
+  echo " docker.exe run -i --network envoy-tests --entrypoint curl.exe windows/consul-dev "$@
+  docker.exe run -i --network envoy-tests --entrypoint curl.exe windows/consul-dev "$@"
+  # docker.exe run -i --network envoy-tests docker.mirror.hashicorp.services/windows/nanoserver curl.exe "$@"
 }
 
 function docker_exec {
@@ -813,9 +815,11 @@ function setup_upsert_l4_intention {
   local SOURCE=$1
   local DESTINATION=$2
   local ACTION=$3
+  # echo "setup_upsert_l4_intention"
+  echo "\"{\\\"Action\\\": \\\"${ACTION}\\\"}\"" "\"http://envoy_consul-primary_1:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}\""
 
-  retry_default docker_curl primary -sL -XPUT "http://127.0.0.1:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}" \
-      -d"{\"Action\": \"${ACTION}\"}" >/dev/null
+  retry_default docker_curl primary -L -X PUT -d"\"{\\\"Action\\\": \\\"${ACTION}\\\"}\"" "\"http://envoy_consul-primary_1:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}\""
+  # echo "fin setup_upsert_l4_intention"
 }
 
 function upsert_l4_intention {
