@@ -543,7 +543,7 @@ function suite_setup {
     # Cleanup from any previous unclean runs.
     suite_teardown 
 
-    docker.exe network create -d "nat" --subnet "10.244.0.0/24" envoy-tests
+    docker.exe network create -d "nat" --subnet "10.244.0.0/24" envoy-tests &>/dev/null
     
     # Start the volume container
     #
