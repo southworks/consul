@@ -581,9 +581,7 @@ function docker_wget {
 function docker_curl {
   local DC=$1
   shift 1
-  echo " docker.exe run -i --network envoy-tests --entrypoint curl.exe windows/consul-dev "$@
-  docker.exe run -i --network envoy-tests --entrypoint curl.exe windows/consul-dev "$@"
-  # docker.exe run -i --network envoy-tests docker.mirror.hashicorp.services/windows/nanoserver curl.exe "$@"
+  docker.exe run -rm --network envoy-tests --entrypoint curl.exe windows/consul-dev "$@"
 }
 
 function docker_exec {
@@ -811,15 +809,18 @@ function register_services {
   docker_consul_exec ${DC} sh -c "consul services register /workdir/${DC}/register/service_*.hcl"
 }
 
+function getIP {
+    docker.exe inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' envoy_consul-primary_1
+}
+
 function setup_upsert_l4_intention {
   local SOURCE=$1
   local DESTINATION=$2
   local ACTION=$3
-  # echo "setup_upsert_l4_intention"
-  echo "\"{\\\"Action\\\": \\\"${ACTION}\\\"}\"" "\"http://envoy_consul-primary_1:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}\""
 
-  retry_default docker_curl primary -L -X PUT -d"\"{\\\"Action\\\": \\\"${ACTION}\\\"}\"" "\"http://envoy_consul-primary_1:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}\""
-  # echo "fin setup_upsert_l4_intention"
+  SERVER_IP=$(getIP)
+
+  retry_default docker_curl primary -sL -X PUT -d"{\"Action\": \"${ACTION}\"}" "http://${SERVER_IP}:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}"
 }
 
 function upsert_l4_intention {

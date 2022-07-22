@@ -218,7 +218,7 @@ function start_consul {
       -grpc-port -1 \
       -client "0.0.0.0" \
       -bind "0.0.0.0" >/dev/null
-    echo "1 - "
+    
     docker.exe run -d --name envoy_consul-${DC}_1 \
       --net=envoy-tests \
       $WORKDIR_SNIPPET \
@@ -570,8 +570,8 @@ function suite_setup {
     docker.exe run --rm -t bats-verify -v
 
     # pre-build the consul+envoy container
-    echo "Rebuilding 'consul-dev-envoy:${ENVOY_VERSION}' image..."
-    docker.exe build -t consul-dev-envoy:${ENVOY_VERSION} \
+    echo "Rebuilding 'consul-dev-envoy:v${ENVOY_VERSION}' image..."
+    docker.exe build -t consul-dev-envoy:v${ENVOY_VERSION} \
          --build-arg ENVOY_VERSION=${ENVOY_VERSION} \
          -f Dockerfile-consul-envoy-windows .
 
