@@ -568,7 +568,7 @@ function docker_consul {
 function docker_consul_for_proxy_bootstrap {
   local DC=$1
   shift 1
-
+  echo "docker.exe run -i --rm --network envoy-tests windows/consul-dev "$@
   docker.exe run -i --rm --network envoy-tests windows/consul-dev "$@"
 }
 
@@ -581,10 +581,11 @@ function docker_wget {
 function docker_curl {
   local DC=$1
   shift 1
-  docker.exe run -rm --network envoy-tests --entrypoint curl.exe windows/consul-dev "$@"
+  docker.exe run --rm --network envoy-tests --entrypoint curl.exe windows/consul-dev "$@"
 }
 
 function docker_exec {
+  
   if ! docker.exe exec -i "$@"
   then
     echo "Failed to execute: docker exec -i $@" 1>&2
@@ -649,7 +650,14 @@ function must_match_in_stats_proxy_response {
 # Envoy rather than a connection-level error.
 function must_fail_tcp_connection {
   # Attempt to curl through upstream
-  run curl --no-keepalive -s -v -f -d hello $1
+  SERVER_IP=$(getIP)
+
+  echo "*"
+  echo "*"
+  echo "*"
+
+  # run curl --no-keepalive -s -v -f -d hello $1
+  run curl --no-keepalive -s -v -f -d hello $SERVER_IP:5000
 
   echo "OUTPUT $output"
 
@@ -757,6 +765,8 @@ function gen_envoy_bootstrap {
   DC=${3:-primary}
   IS_GW=${4:-0}
   EXTRA_ENVOY_BS_ARGS="${5-}"
+  
+  SERVER_IP=$(getIP)
 
   PROXY_ID="$SERVICE"
   if ! is_set "$IS_GW"
@@ -767,6 +777,7 @@ function gen_envoy_bootstrap {
   if output=$(docker_consul_for_proxy_bootstrap "$DC" connect envoy -bootstrap \
     -proxy-id $PROXY_ID \
     -envoy-version "$ENVOY_VERSION" \
+    -http-addr $SERVER_IP:8500 \
     -admin-bind 0.0.0.0:$ADMIN_PORT ${EXTRA_ENVOY_BS_ARGS} 2>&1); then
 
     # All OK, write config to file
@@ -806,7 +817,7 @@ function delete_config_entry {
 
 function register_services {
   local DC=${1:-primary}
-  docker_consul_exec ${DC} sh -c "consul services register /workdir/${DC}/register/service_*.hcl"
+  docker_consul_exec ${DC} bash -c "consul services register workdir/${DC}/register/service_*.hcl"
 }
 
 function getIP {

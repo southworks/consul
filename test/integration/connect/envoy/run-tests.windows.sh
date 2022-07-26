@@ -15,7 +15,7 @@ DEBUG=${DEBUG:-}
 XDS_TARGET=${XDS_TARGET:-server}
 
 # ENVOY_VERSION to run each test against
-ENVOY_VERSION=${ENVOY_VERSION:-"1.22.1"}
+ENVOY_VERSION=${ENVOY_VERSION:-"1.22-latest"}
 export ENVOY_VERSION
 
 export DOCKER_BUILDKIT=1
@@ -290,15 +290,12 @@ function start_partitioned_client {
 
 function pre_service_setup {
   local CLUSTER=${1:-primary}
-  echo "1"
   # Run test case setup (e.g. generating Envoy bootstrap, starting containers)
   if [ -f "${CASE_DIR}/${CLUSTER}/setup.sh" ]
   then
     source ${CASE_DIR}/${CLUSTER}/setup.sh
-    echo "2"
   else
     source ${CASE_DIR}/setup.sh
-    echo "3"
   fi
 }
 
@@ -306,6 +303,7 @@ function start_services {
   # Push the state to the shared docker.exe volume (note this is because CircleCI
   # can't use shared volumes)
   # docker.exe cp workdir/. envoy_workdir_1:/workdir
+
 
   # Start containers required
   if [ ! -z "$REQUIRED_SERVICES" ] ; then
@@ -339,7 +337,7 @@ function verify {
     --pid=host \
     $(network_snippet $CLUSTER) \
     bats-verify \
-    --pretty /workdir/${CLUSTER}/bats ; then
+    --pretty ${CLUSTER}/bats ; then
     echogreen "✓ PASS"
   else
     echored "⨯ FAIL"
