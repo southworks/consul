@@ -650,12 +650,6 @@ function must_fail_tcp_connection {
   # Attempt to curl through upstream
   SERVER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' envoy_consul-primary_1)
 
-  echo "*"
-  echo $SERVER_IP
-  echo "*"
-
-  echo "run curl --no-keepalive -s -v -f -d hello $SERVER_IP:5000"
-
   # run curl --no-keepalive -s -v -f -d hello $1
   run curl --no-keepalive -s -v -f -d hello $SERVER_IP:5000
 

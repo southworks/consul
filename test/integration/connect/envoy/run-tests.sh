@@ -41,7 +41,6 @@ readonly WORKDIR_SNIPPET='-v envoy_workdir:/workdir'
 function network_snippet {
     local DC="$1"
     echo "--net container:envoy_consul-${DC}_1"
-    # echo "--network envoy-tests"
 }
 
 function init_workdir {
@@ -288,7 +287,7 @@ function start_partitioned_client {
 
 function pre_service_setup {
   local CLUSTER=${1:-primary}
-  echo "OK"
+
   # Run test case setup (e.g. generating Envoy bootstrap, starting containers)
   if [ -f "${CASE_DIR}/${CLUSTER}/setup.sh" ]
   then
