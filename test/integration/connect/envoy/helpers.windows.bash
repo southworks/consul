@@ -568,7 +568,6 @@ function docker_consul {
 function docker_consul_for_proxy_bootstrap {
   local DC=$1
   shift 1
-  echo "docker.exe run -i --rm --network envoy-tests windows/consul-dev "$@
   docker.exe run -i --rm --network envoy-tests windows/consul-dev "$@"
 }
 
@@ -585,7 +584,6 @@ function docker_curl {
 }
 
 function docker_exec {
-  
   if ! docker.exe exec -i "$@"
   then
     echo "Failed to execute: docker exec -i $@" 1>&2
@@ -650,11 +648,13 @@ function must_match_in_stats_proxy_response {
 # Envoy rather than a connection-level error.
 function must_fail_tcp_connection {
   # Attempt to curl through upstream
-  SERVER_IP=$(getIP)
+  SERVER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' envoy_consul-primary_1)
 
   echo "*"
+  echo $SERVER_IP
   echo "*"
-  echo "*"
+
+  echo "run curl --no-keepalive -s -v -f -d hello $SERVER_IP:5000"
 
   # run curl --no-keepalive -s -v -f -d hello $1
   run curl --no-keepalive -s -v -f -d hello $SERVER_IP:5000
@@ -666,6 +666,8 @@ function must_fail_tcp_connection {
 
   # Verbose output should enclude empty reply
   echo "$output" | grep 'Empty reply from server'
+
+
 }
 
 function must_pass_tcp_connection {
@@ -778,8 +780,10 @@ function gen_envoy_bootstrap {
     -proxy-id $PROXY_ID \
     -envoy-version "$ENVOY_VERSION" \
     -http-addr $SERVER_IP:8500 \
-    -admin-bind 0.0.0.0:$ADMIN_PORT ${EXTRA_ENVOY_BS_ARGS} 2>&1); then
-
+    -grpc-addr $SERVER_IP:8502 \
+    -admin-access-log-path C:/envoy \
+    -admin-bind 0.0.0.0:$ADMIN_PORT ${EXTRA_ENVOY_BS_ARGS}); then
+    
     # All OK, write config to file
     echo "$output" > workdir/${DC}/envoy/$SERVICE-bootstrap.json
   else
@@ -796,7 +800,7 @@ function read_config_entry {
   local NAME=$2
   local DC=${3:-primary}
 
-  docker_consul "$DC" config read -kind $KIND -name $NAME
+  docker_consul "$DC" config read -kind $KIND -name $NAME -http-addr="consul-$DC:8500"
 }
 
 function wait_for_namespace {
@@ -822,6 +826,10 @@ function register_services {
 
 function getIP {
     docker.exe inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' envoy_consul-primary_1
+}
+
+function getIP_container {
+    docker.exe inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $1
 }
 
 function setup_upsert_l4_intention {

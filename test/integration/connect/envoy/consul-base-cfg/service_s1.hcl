@@ -10,6 +10,7 @@ services {
             local_bind_port = 5000
           }
         ]
+        local_service_address = "envoy_s1-sidecar-proxy_1"
       }
     }
   }

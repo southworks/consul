@@ -15,7 +15,7 @@ DEBUG=${DEBUG:-}
 XDS_TARGET=${XDS_TARGET:-server}
 
 # ENVOY_VERSION to run each test against
-ENVOY_VERSION=${ENVOY_VERSION:-"1.22-latest"}
+ENVOY_VERSION=${ENVOY_VERSION:-"1.22.1"}
 export ENVOY_VERSION
 
 export DOCKER_BUILDKIT=1
@@ -510,6 +510,8 @@ function run_tests {
     pre_service_setup alpha
   fi
 
+  stop_and_copy_files
+
   echo "Starting services"
   start_services
 
@@ -690,6 +692,7 @@ function common_run_container_sidecar_proxy {
   local service="$1"
   local CLUSTER="$2"
 
+
   # Hot restart breaks since both envoys seem to interact with each other
   # despite separate containers that don't share IPC namespace. Not quite
   # sure how this happens but may be due to unix socket being in some shared
@@ -699,7 +702,7 @@ function common_run_container_sidecar_proxy {
     $(network_snippet $CLUSTER) \
     "${HASHICORP_DOCKER_PROXY}/windows/envoy-windows:v${ENVOY_VERSION}" \
     envoy \
-    -c /workdir/${CLUSTER}/envoy/${service}-bootstrap.json \
+    -c C:\\workdir\\${CLUSTER}\\envoy\\${service}-bootstrap.json \
     -l trace \
     --disable-hot-restart \
     --drain-time-s 1 >/dev/null
