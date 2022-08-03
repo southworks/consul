@@ -538,7 +538,7 @@ function check_intention {
   local SOURCE=$1
   local DESTINATION=$2
 
-  curl -s -f "localhost:8500/v1/connect/intentions/check?source=${SOURCE}&destination=${DESTINATION}" | jq ".Allowed"
+  curl -s -f "consul-primary:8500/v1/connect/intentions/check?source=${SOURCE}&destination=${DESTINATION}" | jq ".Allowed"
 }
 
 function assert_intention_allowed {
@@ -773,8 +773,8 @@ function gen_envoy_bootstrap {
   if output=$(docker_consul_for_proxy_bootstrap "$DC" connect envoy -bootstrap \
     -proxy-id $PROXY_ID \
     -envoy-version "$ENVOY_VERSION" \
-    -http-addr $SERVER_IP:8500 \
-    -grpc-addr $SERVER_IP:8502 \
+    -http-addr envoy_consul-${DC}_1:8500 \
+    -grpc-addr envoy_consul-${DC}_1:8502 \
     -admin-access-log-path C:/envoy \
     -admin-bind 0.0.0.0:$ADMIN_PORT ${EXTRA_ENVOY_BS_ARGS}); then
     
@@ -793,14 +793,13 @@ function read_config_entry {
   local KIND=$1
   local NAME=$2
   local DC=${3:-primary}
-
   docker_consul "$DC" config read -kind $KIND -name $NAME -http-addr="consul-$DC:8500"
 }
 
 function wait_for_namespace {
   local NS="${1}"
   local DC=${2:-primary}
-  retry_default docker_curl "$DC" -sLf "http://127.0.0.1:8500/v1/namespace/${NS}" >/dev/null
+  retry_default docker_curl "$DC" -sLf "http://consul-${DC}:8500/v1/namespace/${NS}" >/dev/null
 }
 
 function wait_for_config_entry {
@@ -810,7 +809,7 @@ function wait_for_config_entry {
 function delete_config_entry {
   local KIND=$1
   local NAME=$2
-  retry_default curl -sL -XDELETE "http://127.0.0.1:8500/v1/config/${KIND}/${NAME}"
+  retry_default curl -sL -XDELETE "http://consul-primary:8500/v1/config/${KIND}/${NAME}"
 }
 
 function register_services {
@@ -831,9 +830,7 @@ function setup_upsert_l4_intention {
   local DESTINATION=$2
   local ACTION=$3
 
-  SERVER_IP=$(getIP)
-
-  retry_default docker_curl primary -sL -X PUT -d"{\"Action\": \"${ACTION}\"}" "http://${SERVER_IP}:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}"
+  retry_default docker_curl primary -sL -X PUT -d"{\"Action\": \"${ACTION}\"}" "http://consul-primary:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}"
 }
 
 function upsert_l4_intention {
@@ -841,18 +838,18 @@ function upsert_l4_intention {
   local DESTINATION=$2
   local ACTION=$3
 
-  retry_default curl -sL -XPUT "http://127.0.0.1:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}" \
+  retry_default curl -sL -XPUT "http://consul-primary:8500/v1/connect/intentions/exact?source=${SOURCE}&destination=${DESTINATION}" \
       -d"{\"Action\": \"${ACTION}\"}" >/dev/null
 }
 
 function get_ca_root {
-  curl -s -f "http://localhost:8500/v1/connect/ca/roots" | jq -r ".Roots[0].RootCert"
+  curl -s -f "http://consul-primary:8500/v1/connect/ca/roots" | jq -r ".Roots[0].RootCert"
 }
 
 function wait_for_agent_service_register {
   local SERVICE_ID=$1
   local DC=${2:-primary}
-  retry_default docker_curl "$DC" -sLf "http://127.0.0.1:8500/v1/agent/service/${SERVICE_ID}" >/dev/null
+  retry_default docker_curl "$DC" -sLf "http://consul-${DC}:8500/v1/agent/service/${SERVICE_ID}" >/dev/null
 }
 
 function set_ttl_check_state {
@@ -872,7 +869,7 @@ function set_ttl_check_state {
       return 1
   esac
 
-  retry_default docker_curl "${DC}" -sL -XPUT "http://localhost:8500/v1/agent/check/warn/${CHECK_ID}"
+  retry_default docker_curl "${DC}" -sL -XPUT "http://consul-${DC}:8500/v1/agent/check/warn/${CHECK_ID}"
 }
 
 function get_upstream_fortio_name {
