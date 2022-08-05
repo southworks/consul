@@ -23,6 +23,11 @@ If any of the docker images does not exist or is mistagged, an error similar to 
 Error response from daemon: No such container: envoy_workdir_1
 ```
 
+If you run the Windows tests from WSL you will get the following error message:
+```powershell
+main_test.go:34: command failed: exec: "cmd": executable file not found in $PATH
+```
+
 ## Considerations on differences in scripts
 
 - Creation of a new directory test case that includes the basic Windows configuration files. These configuration files include the definition of "local_service_address".
@@ -33,6 +38,5 @@ Error response from daemon: No such container: envoy_workdir_1
 - The "config-dir" path of the creation of the images of "envoy_consul" was adapted to adapt to the Windows format.
 - The use of the function "stop_and_copy_files" was included after the creation of the bootstrap files to include these among the shared files in the volume.
 
-After these changes, the "case-badauthz", "basic" and "centralconf" tests were executed, these worked without any problem until the execution of the tests in the bats container.
 
 
