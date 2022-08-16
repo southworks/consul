@@ -8,46 +8,43 @@ function check_hostport {
     local HOSTPORT=$1
     if [[ $HOSTPORT == "localhost:8500" ]]
     then        
-        ADDRESS=$(getIP_container envoy_consul-primary_1)
+        ADDRESS=$(nslookup envoy_consul-primary_1)
         CONTAINER_HOSTPORT="${ADDRESS}:8500"
     elif [[ $HOSTPORT == *"localhost:21000"* ]]
     then
-        ADDRESS=$(getIP_container envoy_s1-sidecar-proxy_1)
+        ADDRESS=$(nslookup envoy_s1-sidecar-proxy_1)
         CONTAINER_HOSTPORT="${HOSTPORT/localhost:21000/"${ADDRESS}:21000"}"
     elif [[ $HOSTPORT == *"localhost:21001"* ]]
     then
-        ADDRESS=$(getIP_container envoy_s2-sidecar-proxy_1)
+        ADDRESS=$(nslookup envoy_s2-sidecar-proxy_1)
         CONTAINER_HOSTPORT="${HOSTPORT/localhost:21000/"${ADDRESS}:21000"}"
     elif [[ $HOSTPORT == *"localhost:19000"* ]]
     then
-        ADDRESS=getIP_container envoy_s1-sidecar-proxy_1
-        echo "@@@@+++"
-        echo $ADDRESS
-        echo "+++@@@@"
+        ADDRESS=$(nslookup envoy_s1-sidecar-proxy_1)
         CONTAINER_HOSTPORT="${HOSTPORT/localhost:19000/"${ADDRESS}:19000"}"
     elif [[ $HOSTPORT == *"localhost:19001"* ]]
     then
-        ADDRESS=$(getIP_container envoy_s2-sidecar-proxy_1)
+        ADDRESS=$(nslookup envoy_s2-sidecar-proxy_1)
         CONTAINER_HOSTPORT="${HOSTPORT/localhost:19001/"${ADDRESS}:19001"}"
     elif [[ $HOSTPORT == *"127.0.0.1:19000"* ]]
     then
-        ADDRESS=$(getIP_container envoy_s1-sidecar-proxy_1)
+        ADDRESS=$(nslookup envoy_s1-sidecar-proxy_1)
         CONTAINER_HOSTPORT="${HOSTPORT/127.0.0.1:19000/"${ADDRESS}:19000"}"
     elif [[ $HOSTPORT == *"127.0.0.1:19001"* ]]
     then
-        ADDRESS=$(getIP_container envoy_s2-sidecar-proxy_1)
+        ADDRESS=$(nslookup envoy_s2-sidecar-proxy_1)
         CONTAINER_HOSTPORT="${HOSTPORT/127.0.0.1:19001/"${ADDRESS}:19001"}"    
     elif [[ $HOSTPORT == *"localhost:1234"* ]]
     then
-        ADDRESS=$(getIP_container envoy_s1-sidecar-proxy_1)
+        ADDRESS=$(nslookup envoy_s1-sidecar-proxy_1)
         CONTAINER_HOSTPORT="${HOSTPORT/localhost:1234/"${ADDRESS}:1234"}"      
     elif [[ $HOSTPORT == "localhost:2345" ]]
     then
-        ADDRESS=$(getIP_container envoy_s2-sidecar-proxy_1)
+        ADDRESS=$(nslookup envoy_s2-sidecar-proxy_1)
        CONTAINER_HOSTPORT="${HOSTPORT/localhost:2345/"${ADDRESS}:2345"}"
      elif [[ $HOSTPORT == *"localhost:5000"* ]]
     then
-        ADDRESS=$(getIP_container envoy_s2_1)
+        ADDRESS=$(nslookup envoy_s2_1)
        CONTAINER_HOSTPORT="${HOSTPORT/localhost:5000/"${ADDRESS}:5000"}"                  
     else
         return 1        
