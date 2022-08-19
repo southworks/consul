@@ -973,7 +973,70 @@ function get_upstream_fortio_name {
 function assert_expected_fortio_name {
   local EXPECT_NAME=$1
   local HOST=${2:-"localhost"} $(check_hostport $2)
-echo "$output" >&3
+  local PORT=${3:-5000}
+  local URL_PREFIX=${4:-""}
+  local DEBUG_HEADER_VALUE="${5:-""}"
+
+  run get_upstream_fortio_name ${HOST} ${PORT} "${URL_PREFIX}" "${DEBUG_HEADER_VALUE}"
+
+  echo "GOT: $output"
+
+  [ "$status" == 0 ]
+  [ "$output" == "FORTIO_NAME=${EXPECT_NAME}" ]
+}
+
+function assert_expected_fortio_name_pattern {
+  local EXPECT_NAME_PATTERN=$1
+  local HOST=${2:-"localhost"}
+  local PORT=${3:-5000}
+  local URL_PREFIX=${4:-""}
+  local DEBUG_HEADER_VALUE="${5:-""}"
+
+  GOT=$(get_upstream_fortio_name ${HOST} ${PORT} "${URL_PREFIX}" "${DEBUG_HEADER_VALUE}")
+
+  if [[ "$GOT" =~ $EXPECT_NAME_PATTERN ]]; then
+      :
+  else
+    echo "expected name pattern: $EXPECT_NAME_PATTERN, actual name: $GOT" 1>&2
+    return 1
+  fi
+}
+
+function get_upstream_fortio_host_header {
+  local HOST=$1
+  local PORT=$2
+  local PREFIX=$3
+  local DEBUG_HEADER_VALUE="${4:-""}"
+  local extra_args
+  if [[ -n "${DEBUG_HEADER_VALUE}" ]]; then
+      extra_args="-H x-test-debug:${DEBUG_HEADER_VALUE}"
+  fi
+  run retry_default curl -v -s -f -H"Host: ${HOST}" $extra_args \
+      "localhost:${PORT}${PREFIX}/debug"
+  [ "$status" == 0 ]
+  echo "$output" | grep -E "^Host: "
+}
+
+function assert_expected_fortio_host_header {
+  local EXPECT_HOST=$1
+  local HOST=${2:-"localhost"}
+  local PORT=${3:-5000}
+  local URL_PREFIX=${4:-""}
+  local DEBUG_HEADER_VALUE="${5:-""}"
+
+  GOT=$(get_upstream_fortio_host_header ${HOST} ${PORT} "${URL_PREFIX}" "${DEBUG_HEADER_VALUE}")
+
+  if [ "$GOT" != "Host: ${EXPECT_HOST}" ]; then
+    echo "expected Host header: $EXPECT_HOST, actual Host header: $GOT" 1>&2
+    return 1
+  fi
+}
+
+function create_peering {
+  local GENERATE_PEER=$1
+  local ESTABLISH_PEER=$2
+  run curl -sL -XPOST "http://consul-${GENERATE_PEER}-client:8500/v1/peering/token" -d"{ \"PeerName\" : \"${GENERATE_PEER}-to-${ESTABLISH_PEER}\" }"
+  # echo "$output" >&3
   [ "$status" == 0 ]
 
   local token
