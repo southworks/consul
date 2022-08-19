@@ -1,0 +1,81 @@
+package main
+import (
+  	"os"
+	"io"
+  	"flag"
+	"strings"
+	"github.com/Jeffail/gabs/v2"
+	"io/ioutil"
+)
+
+func main() {
+	var configFile string;
+	var tag string;
+	var data string;	
+
+	flag.StringVar(&configFile, "config", "./consul-windows-base-cfg/base.hcl", "File to use.")
+	flag.StringVar(&tag, "tag", "tag", "tag to use.")
+	flag.StringVar(&data, "data", "data", "data to use.")
+	flag.Parse()
+
+	addToLog("Abriendo el archivo: "+configFile+"\n")
+
+	var file, err = os.OpenFile(configFile, os.O_RDWR, 0644)
+	if existeError(err) {
+		return
+	}
+    	// File a string
+	var buf strings.Builder
+	_, erro := io.Copy(&buf, file)
+	if erro != nil {
+		panic(erro)
+	}
+	s := buf.String()
+
+	addToLog("\n\n"+s+"\n\n")
+
+	jsonParsed, err := gabs.ParseJSON([]byte(s))
+	jsonParsed.Set(data, "services", tag)
+
+	addToLog("Agregando el dato: "+tag+" = "+data+"\n")
+	addToLog(jsonParsed.StringIndent("", "  ")+"\n")
+
+	for _, child := range jsonParsed.S("services").Children() {
+		// child.Set(data, "proxy", tag)
+		for _, childconnect := range child.S("connect").Children() {
+			// childconnect.Set(data, "proxy", tag)
+			for _, childsidecar_service := range childconnect.S("sidecar_service").Children() {
+				for _, childproxy := range childsidecar_service.S("proxy").Children() {
+					childproxy.Set(data, tag)
+				}
+			}
+		}
+	}
+
+    err = ioutil.WriteFile(configFile, []byte(jsonParsed.StringIndent("", "  ")), 0644)
+
+    if err != nil {
+        panic(err)
+    }
+}
+
+func existeError(err error) bool {
+  if err != nil {
+    panic(err.Error())
+  }
+  return (err != nil)
+}
+
+func addToLog(message string) bool {
+	var log, err_log = os.OpenFile("log.txt", os.O_WRONLY, 0644)
+
+	n, _ := log.Seek(0, os.SEEK_END)
+
+	if _, err_log = log.WriteAt([]byte(message+"\n"), n); err_log != nil {
+		panic(err_log)
+		return false
+    }
+
+ 	log.Close()
+	return true
+}

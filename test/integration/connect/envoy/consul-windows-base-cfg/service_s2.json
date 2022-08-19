@@ -1,0 +1,19 @@
+{
+  "services": [
+    {
+      "connect": [
+        {
+          "sidecar_service": [
+            {
+              "proxy": [
+                {}
+              ]
+            }
+          ]
+        }
+      ],
+      "name": "s2",
+      "port": 8181
+    }
+  ]
+}

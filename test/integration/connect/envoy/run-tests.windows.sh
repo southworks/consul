@@ -62,6 +62,7 @@ function init_workdir {
 
   # Reload consul config from defaults
   cp consul-windows-base-cfg/*.hcl workdir/${CLUSTER}/consul/
+  cp consul-windows-base-cfg/*.json workdir/${CLUSTER}/consul/
 
   # Add any overrides if there are any (no op if not)
   find ${CASE_DIR} -maxdepth 1 -name '*.hcl' -type f -exec cp -f {} workdir/${CLUSTER}/consul \;
@@ -706,6 +707,14 @@ function common_run_container_sidecar_proxy {
     -l trace \
     --disable-hot-restart \
     --drain-time-s 1 >/dev/null
+
+  IP=$(docker.exe inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' envoy_${service}-sidecar-proxy_1)
+
+  echo "./update_config.exe -config='workdir/${CLUSTER}/consul/service_${service}.json' -tag='local_service_address' -data='${IP}'"
+  ./update_config.exe -config=workdir/${CLUSTER}/consul/service_${service}.json -tag=local_service_address -data="${IP}"
+  stop_and_copy_files
+  docker_consul_exec ${CLUSTER} bash -c "consul services deregister -id=${service}"
+  docker_consul_exec ${CLUSTER} bash -c "consul services register workdir/${CLUSTER}/consul/service_${service}.json"
 }
 
 function run_container_s1-sidecar-proxy {

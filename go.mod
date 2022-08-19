@@ -103,6 +103,8 @@ require (
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/DataDog/datadog-go v3.2.0+incompatible // indirect
+	github.com/Jeffail/gabs v1.4.0 // indirect
+	github.com/Jeffail/gabs/v2 v2.6.1 // indirect
 	github.com/Microsoft/go-winio v0.4.3 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
