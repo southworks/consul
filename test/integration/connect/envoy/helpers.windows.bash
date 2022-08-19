@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# CONTAINER_HOSTPORT=""
+CONTAINER_HOSTPORT=""
 
-# This function uses regex to change the localhost with the corresponding container name.
 # This function uses regex to change the localhost with the corresponding container name.
 function check_hostport {
     local HOSTPORT=$1
@@ -887,7 +886,6 @@ function getIP {
 }
 
 function getIP_container {
-  # echo "docker.exe inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $1"
   docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $1
 }
 
