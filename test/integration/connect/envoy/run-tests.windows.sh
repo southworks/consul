@@ -710,7 +710,6 @@ function common_run_container_sidecar_proxy {
 
   IP=$(docker.exe inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' envoy_${service}-sidecar-proxy_1)
 
-  echo "./update_config.exe -config='workdir/${CLUSTER}/consul/service_${service}.json' -tag='local_service_address' -data='${IP}'"
   ./update_config.exe -config=workdir/${CLUSTER}/consul/service_${service}.json -tag=local_service_address -data="${IP}"
   stop_and_copy_files
   docker_consul_exec ${CLUSTER} bash -c "consul services deregister -id=${service}"
