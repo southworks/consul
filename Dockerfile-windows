@@ -1,5 +1,4 @@
 FROM mcr.microsoft.com/windows/servercore:1809
-
 ENV VERSION=1.12.0
 
 LABEL org.opencontainers.image.authors="Consul Team <consul@hashicorp.com>" \
@@ -11,6 +10,11 @@ LABEL org.opencontainers.image.authors="Consul Team <consul@hashicorp.com>" \
       org.opencontainers.image.title="consul" \
       org.opencontainers.image.description="Consul is a datacenter runtime that provides service discovery, configuration, and orchestration."
 
+# FROM envoyproxy/envoy-windows:v1.19.5 as envoy
+# COPY --from=envoy ["Program Files\envoy", "C:\envoy"]
+RUN mkdir C:\\envoy
+COPY build-support-windows/envoy.exe envoy/envoy.exe
+
 RUN ["powershell", "Set-ExecutionPolicy", "Bypass", "-Scope", "Process", "-Force;"]
 RUN ["powershell", "iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))"]
 
@@ -19,7 +23,6 @@ RUN choco install git.install -yf
 RUN mkdir C:\\consul
 RUN mkdir C:\\consul\\data
 RUN mkdir C:\\consul\\config
-
 
 # Server RPC is used for communication between Consul clients and servers for internal
 # request forwarding.
@@ -37,7 +40,15 @@ EXPOSE 8500 8600 8600/udp
 ENV CONSUL_URL=https://releases.hashicorp.com/consul/${VERSION}/consul_${VERSION}_windows_amd64.zip
 RUN curl %CONSUL_URL% -L -o consul.zip
 RUN tar -xf consul.zip -C consul
-ENV PATH C:\\Program Files\\Git\\bin;C:\\consul;C:\\Windows\\System32;%PATH%
+
+RUN mkdir fortio
+
+ENV FORTIO_URL=https://github.com/fortio/fortio/releases/download/v1.33.0/fortio_win_1.33.0.zip
+RUN curl %FORTIO_URL% -L -o fortio.zip
+
+RUN tar -xf fortio.zip -C fortio
+
+ENV PATH C:\\Program Files\\Git\\bin;C:\\consul;C:\\Windows\\System32;C:\\fortio;C:\\envoy;%PATH%
 
 COPY .release/docker/docker-entrypoint-windows.sh C:\\docker-entrypoint-windows.sh
 ENTRYPOINT ["bash.exe", "docker-entrypoint-windows.sh"]

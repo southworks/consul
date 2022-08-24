@@ -545,10 +545,10 @@ function workdir_cleanup {
 function suite_setup {
     # Cleanup from any previous unclean runs.
     suite_teardown
-    docker.exe network create -d transparent envoy-tests
+    # docker.exe network create -d transparent envoy-tests
     # docker.exe network create -d transparent --subnet=10.244.0.0/24 -o com.docker.network.windowsshim.interface="Ethernet" envoy-tests
     # docker.exe network create -d "nat" --subnet "10.244.0.0/24" envoy-tests &>/dev/null
-    # docker.exe network create -d "nat" envoy-tests &>/dev/null
+    docker.exe network create -d "nat" envoy-tests &>/dev/null
     # Start the volume container
     #
     # This is a dummy container that we use to create volume and keep it
