@@ -2,7 +2,7 @@
 
 ## Description of the problem
 
-The tests migration’s from Linux env to Windows env was carried out. This brought a fundamental difference between both architectures. In the Linux environment, a Docker network of the Host type is set up. The operation of this type of network is that (at the network level) the separations between the different containers are eliminated. This way all containers share the localhost of the host. What does this mean? that all tests and configuration files point to localhost regardless of whether they are in different containers.
+The tests' migration from Linux env to Windows env was carried out. This brought a fundamental difference between both architectures. In the Linux environment, a Docker network of the Host type is set up. The operation of this type of network is that (at the network level) the separations between the different containers are eliminated. This way all containers share the localhost of the host. What does this mean? that all tests and configuration files point to localhost regardless of whether they are in different containers.
 What happens in Windows? Host networks are not supported. In Docker networks for Windows each container is a separate unit with its own addresses. This impacts not only the execution of the tests, but all the configurations require an update since in most cases they would point to a localhost that will not have the information because it is in another container.
 
 ### Linux network diagram
@@ -66,7 +66,7 @@ fortio server -http-port ":8181" -grpc-port ":8179"
 
 ### Changes when starting sidecar
 
-At the time of starting the sidecar of the services until now, an Envoy containment was mounted. The proposal runs this Envoy inside consul-primary. The function would be modified so that instead of raising the container, it executes commands of the type:
+Currently, when starting the service's sidecar proxy an Envoy container is mounted. The proposal runs this Envoy inside consul-primary. The function would be modified so that instead of raising the container, it executes commands of the type:
 
 ```
 C:\envoy\envoy -c C:\workdir\primary\envoy\s1-bootstrap.json -l trace --disable-hot-restart --drain-time-s 1
@@ -74,7 +74,7 @@ C:\envoy\envoy -c C:\workdir\primary\envoy\s1-bootstrap.json -l trace --disable-
 
 ### Change in the way of creating the Workdir Volume
 
-To avoid the current process in windows of lowering the volume and bringing it back online every time an update is required, it is recommended to change the volume type to a dynamic one.
+To avoid the current process in windows of stopping the container and starting it back again, it is recommended to change the volume type to a dynamic one.
 
 ## Proof of Concept
 
