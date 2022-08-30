@@ -572,12 +572,6 @@ function suite_setup {
     echo "Checking bats image..."
     docker.exe run --rm -t bats-verify -v
 
-    # pre-build the consul+envoy container
-    echo "Rebuilding 'consul-dev-envoy:v${ENVOY_VERSION}' image..."
-    docker.exe build -t consul-dev-envoy:v${ENVOY_VERSION} \
-         --build-arg ENVOY_VERSION=${ENVOY_VERSION} \
-         -f Dockerfile-consul-envoy-windows .
-
     # pre-build the test-sds-server container
     echo "Rebuilding 'test-sds-server' image..."
     docker.exe build -t test-sds-server -f Dockerfile-test-sds-server-windows test-sds-server
