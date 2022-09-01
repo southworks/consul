@@ -172,9 +172,9 @@ function get_cert {
   local SNI_FLAG=""
   if [ -n "$SERVER_NAME" ]; then
     SNI_FLAG="-servername $SERVER_NAME"
-  fi  
+  fi
   CERT=$(openssl s_client -connect $HOSTPORT $SNI_FLAG -showcerts </dev/null)  
-  openssl x509 -noout -text <<< "$CERT"  
+  openssl x509 -noout -text <<< "$CERT"
 }
 
 function assert_proxy_presents_cert_uri {
@@ -182,14 +182,12 @@ function assert_proxy_presents_cert_uri {
   local SERVICENAME=$2
   local DC=${3:-primary}
   local NS=${4:-default}
-  local PARTITION=${5:default}
-  
+  local PARTITION=${5:default}  
   CERT=$(retry_default get_cert $HOSTPORT)
 
   echo "WANT SERVICE: ${PARTITION}/${NS}/${SERVICENAME}"
   echo "GOT CERT:"
-  echo "$CERT"
-  
+  echo "$CERT"  
 
   if [[ -z $PARTITION ]] || [[ $PARTITION = "default" ]]; then
     echo "$CERT" | grep -Eo "URI:spiffe://([a-zA-Z0-9-]+).consul/ns/${NS}/dc/${DC}/svc/$SERVICENAME"
