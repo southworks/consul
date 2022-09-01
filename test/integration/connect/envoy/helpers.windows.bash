@@ -5,48 +5,39 @@ CONTAINER_HOSTPORT=""
 # This function uses regex to change the localhost with the corresponding container name.
 function check_hostport {
     local HOSTPORT=$1
+    local ADDRESS="consul-primary"
     if [[ $HOSTPORT == "localhost:8500" ]]
     then        
-        ADDRESS="consul-primary"
-        CONTAINER_HOSTPORT="${ADDRESS}:8500"
+      CONTAINER_HOSTPORT="${ADDRESS}:8500"
     elif [[ $HOSTPORT == *"localhost:21000"* ]]
-    then
-        ADDRESS="consul-primary"
-        CONTAINER_HOSTPORT="${HOSTPORT/localhost:21000/"${ADDRESS}:21000"}"
+    then        
+      CONTAINER_HOSTPORT="${HOSTPORT/localhost:21000/"${ADDRESS}:21000"}"
     elif [[ $HOSTPORT == *"localhost:21001"* ]]
-    then
-        ADDRESS="consul-primary"
-        CONTAINER_HOSTPORT="${HOSTPORT/localhost:21001/"${ADDRESS}:21001"}"
+    then        
+      CONTAINER_HOSTPORT="${HOSTPORT/localhost:21001/"${ADDRESS}:21001"}"
     elif [[ $HOSTPORT == *"localhost:19000"* ]]
-    then
-        ADDRESS="consul-primary"
-        CONTAINER_HOSTPORT="${HOSTPORT/localhost:19000/"${ADDRESS}:19000"}"
+    then        
+      CONTAINER_HOSTPORT="${HOSTPORT/localhost:19000/"${ADDRESS}:19000"}"
     elif [[ $HOSTPORT == *"localhost:19001"* ]]
-    then
-        ADDRESS="consul-primary"
-        CONTAINER_HOSTPORT="${HOSTPORT/localhost:19001/"${ADDRESS}:19001"}"
+    then        
+      CONTAINER_HOSTPORT="${HOSTPORT/localhost:19001/"${ADDRESS}:19001"}"
     elif [[ $HOSTPORT == *"127.0.0.1:19000"* ]]
-    then
-        ADDRESS="consul-primary"
-        CONTAINER_HOSTPORT="${HOSTPORT/127.0.0.1:19000/"${ADDRESS}:19000"}"
+    then        
+      CONTAINER_HOSTPORT="${HOSTPORT/127.0.0.1:19000/"${ADDRESS}:19000"}"
     elif [[ $HOSTPORT == *"127.0.0.1:19001"* ]]
-    then
-        ADDRESS="consul-primary"
-        CONTAINER_HOSTPORT="${HOSTPORT/127.0.0.1:19001/"${ADDRESS}:19001"}"    
+    then        
+      CONTAINER_HOSTPORT="${HOSTPORT/127.0.0.1:19001/"${ADDRESS}:19001"}"    
     elif [[ $HOSTPORT == *"localhost:1234"* ]]
-    then
-        ADDRESS="consul-primary"
-        CONTAINER_HOSTPORT="${HOSTPORT/localhost:1234/"${ADDRESS}:1234"}"      
+    then        
+      CONTAINER_HOSTPORT="${HOSTPORT/localhost:1234/"${ADDRESS}:1234"}"      
     elif [[ $HOSTPORT == "localhost:2345" ]]
-    then
-        ADDRESS="consul-primary"
-       CONTAINER_HOSTPORT="${HOSTPORT/localhost:2345/"${ADDRESS}:2345"}"
+    then       
+      CONTAINER_HOSTPORT="${HOSTPORT/localhost:2345/"${ADDRESS}:2345"}"
      elif [[ $HOSTPORT == *"localhost:5000"* ]]
-    then
-        ADDRESS="consul-primary"
-       CONTAINER_HOSTPORT="${HOSTPORT/localhost:5000/"${ADDRESS}:5000"}"                  
+    then       
+      CONTAINER_HOSTPORT="${HOSTPORT/localhost:5000/"${ADDRESS}:5000"}"                  
     else
-        return 1        
+      return 1        
     fi
 }
 # retry based on
