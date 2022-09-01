@@ -826,7 +826,7 @@ function gen_envoy_bootstrap {
   IS_GW=${4:-0}
   EXTRA_ENVOY_BS_ARGS="${5-}"
   
-  SERVER_IP=$(getIP)
+  SERVER_IP=$(getIP_container $DC)
 
   PROXY_ID="$SERVICE"
   if ! is_set "$IS_GW"
