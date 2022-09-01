@@ -13,6 +13,8 @@ RUN tar -xf fortio.zip -C fortio
 RUN mkdir C:\\envoy
 COPY envoy.exe envoy/envoy.exe
 
+RUN choco install openssl -yf
+
 EXPOSE 8300
 EXPOSE 8301 8301/udp 8302 8302/udp
 EXPOSE 8500 8600 8600/udp
@@ -21,4 +23,4 @@ EXPOSE 8502
 EXPOSE 19000 19001 19002 19003 19004
 EXPOSE 21000 21001 21002 21003 21004
 
-ENV PATH C:\\Program Files\\Git\\bin;C:\\consul;C:\\fortio;C:\\envoy;C:\\Windows\\System32;%PATH%
+ENV PATH C:\\Program Files\\Git\\bin;C:\\consul;C:\\fortio;C:\\envoy;C:\\Windows\\System32;C:\\Program Files\\OpenSSL-Win64\\bin;%PATH%

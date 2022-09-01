@@ -39,7 +39,7 @@ function command_error {
 
 trap 'command_error $? "${BASH_COMMAND}" "${LINENO}" "${FUNCNAME[0]:-main}" "${BASH_SOURCE[0]}:${BASH_LINENO[0]}"' ERR
 
-readonly WORKDIR_SNIPPET="-v envoy_workdir:C:\workdir"
+readonly WORKDIR_SNIPPET="-v envoy_workdir_new:C:\workdir"
 
 function network_snippet {
     local DC="$1"
@@ -62,7 +62,7 @@ function init_workdir {
 
   # Reload consul config from defaults
   cp consul-windows-base-cfg/*.hcl workdir/${CLUSTER}/consul/
-  cp consul-windows-base-cfg/envoy/*.json workdir/${CLUSTER}/envoy/
+  # cp consul-windows-base-cfg/envoy/*.json workdir/${CLUSTER}/envoy/
 
   # Add any overrides if there are any (no op if not)
   find ${CASE_DIR} -maxdepth 1 -name '*.hcl' -type f -exec cp -f {} workdir/${CLUSTER}/consul \;
@@ -303,7 +303,7 @@ function pre_service_setup {
 function start_services {
   # Push the state to the shared docker.exe volume (note this is because CircleCI
   # can't use shared volumes)
-  # docker.exe cp workdir/. envoy_workdir_1:/workdir
+  # docker.exe cp workdir/. envoy_workdir_new_1:/workdir
 
 
   # Start containers required
@@ -433,13 +433,13 @@ function stop_and_copy_files {
     # Create CMD file to execute within the container
     echo "XCOPY C:\workdir_bak C:\workdir /e /h /c /i /y" > copy.cmd
     # Stop dummy container to copy local workdir to container's workdir_bak    
-    docker.exe stop envoy_workdir_1
-    docker.exe cp workdir/. envoy_workdir_1:/workdir_bak
+    docker.exe stop envoy_workdir_new_1
+    docker.exe cp workdir/. envoy_workdir_new_1:/workdir_bak
     # Copy CMD file into container
-    docker.exe cp copy.cmd envoy_workdir_1:/
+    docker.exe cp copy.cmd envoy_workdir_new_1:/
     # Start dummy container and execute the CMD file
-    docker.exe start envoy_workdir_1
-    docker.exe exec envoy_workdir_1 copy.cmd
+    docker.exe start envoy_workdir_new_1
+    docker.exe exec envoy_workdir_new_1 copy.cmd
     # Delete local CMD file after execution
     rm copy.cmd
 }
@@ -538,7 +538,7 @@ function test_teardown {
 
 function workdir_cleanup {
   docker_kill_rm workdir
-  docker.exe volume rm -f envoy_workdir &>/dev/null || true
+  docker.exe volume rm -f envoy_workdir_new &>/dev/null || true
 }
 
 
@@ -553,8 +553,8 @@ function suite_setup {
     #
     # This is a dummy container that we use to create volume and keep it
     # accessible while other containers are down.
-    docker.exe volume create envoy_workdir &>/dev/null
-    docker.exe run -d --name envoy_workdir_1 \
+    docker.exe volume create envoy_workdir_new &>/dev/null
+    docker.exe run -d --name envoy_workdir_new_1 \
         $WORKDIR_SNIPPET \
         --net=none \
         "${HASHICORP_DOCKER_PROXY}/windows/kubernetes/pause" &>/dev/null
