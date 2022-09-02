@@ -6,40 +6,42 @@ CONTAINER_HOSTPORT=""
 function check_hostport {
     local HOSTPORT=$1
     local ADDRESS="consul-primary"
+
     if [[ $HOSTPORT == "localhost:8500" ]]
-    then        
+    then
       CONTAINER_HOSTPORT="${ADDRESS}:8500"
     elif [[ $HOSTPORT == *"localhost:21000"* ]]
-    then        
+    then
       CONTAINER_HOSTPORT="${HOSTPORT/localhost:21000/"${ADDRESS}:21000"}"
     elif [[ $HOSTPORT == *"localhost:21001"* ]]
-    then        
+    then
       CONTAINER_HOSTPORT="${HOSTPORT/localhost:21001/"${ADDRESS}:21001"}"
     elif [[ $HOSTPORT == *"localhost:19000"* ]]
-    then        
+    then
       CONTAINER_HOSTPORT="${HOSTPORT/localhost:19000/"${ADDRESS}:19000"}"
     elif [[ $HOSTPORT == *"localhost:19001"* ]]
-    then        
+    then
       CONTAINER_HOSTPORT="${HOSTPORT/localhost:19001/"${ADDRESS}:19001"}"
     elif [[ $HOSTPORT == *"127.0.0.1:19000"* ]]
-    then        
+    then
       CONTAINER_HOSTPORT="${HOSTPORT/127.0.0.1:19000/"${ADDRESS}:19000"}"
     elif [[ $HOSTPORT == *"127.0.0.1:19001"* ]]
-    then        
+    then
       CONTAINER_HOSTPORT="${HOSTPORT/127.0.0.1:19001/"${ADDRESS}:19001"}"    
     elif [[ $HOSTPORT == *"localhost:1234"* ]]
-    then        
+    then
       CONTAINER_HOSTPORT="${HOSTPORT/localhost:1234/"${ADDRESS}:1234"}"      
     elif [[ $HOSTPORT == "localhost:2345" ]]
-    then       
+    then
       CONTAINER_HOSTPORT="${HOSTPORT/localhost:2345/"${ADDRESS}:2345"}"
      elif [[ $HOSTPORT == *"localhost:5000"* ]]
-    then       
-      CONTAINER_HOSTPORT="${HOSTPORT/localhost:5000/"${ADDRESS}:5000"}"                  
+    then
+      CONTAINER_HOSTPORT="${HOSTPORT/localhost:5000/"${ADDRESS}:5000"}"
     else
-      return 1        
+      return 1
     fi
 }
+
 # retry based on
 # https://github.com/fernandoacorreia/azure-docker-registry/blob/master/tools/scripts/create-registry-server
 # under MIT license.
@@ -173,12 +175,12 @@ function assert_proxy_presents_cert_uri {
   local SERVICENAME=$2
   local DC=${3:-primary}
   local NS=${4:-default}
-  local PARTITION=${5:default}  
+  local PARTITION=${5:default}
   CERT=$(retry_default get_cert $HOSTPORT)
 
   echo "WANT SERVICE: ${PARTITION}/${NS}/${SERVICENAME}"
   echo "GOT CERT:"
-  echo "$CERT"  
+  echo "$CERT"
 
   if [[ -z $PARTITION ]] || [[ $PARTITION = "default" ]]; then
     echo "$CERT" | grep -Eo "URI:spiffe://([a-zA-Z0-9-]+).consul/ns/${NS}/dc/${DC}/svc/$SERVICENAME"
@@ -252,7 +254,7 @@ function assert_envoy_version {
 
 function assert_envoy_expose_checks_listener_count {
   check_hostport $1
-  local HOSTPORT=$CONTAINER_HOSTPORT  
+  local HOSTPORT=$CONTAINER_HOSTPORT
   local EXPECT_PATH=$2
 
   # scrape this once
@@ -286,7 +288,7 @@ function get_envoy_expose_checks_listener_once {
 
 function assert_envoy_http_rbac_policy_count {
   check_hostport $1
-  local HOSTPORT=$CONTAINER_HOSTPORT  
+  local HOSTPORT=$CONTAINER_HOSTPORT
   local EXPECT_COUNT=$2
 
   GOT_COUNT=$(get_envoy_http_rbac_once $HOSTPORT | jq '.rules.policies | length')
@@ -296,7 +298,7 @@ function assert_envoy_http_rbac_policy_count {
 
 function get_envoy_http_rbac_once {
   check_hostport $1
-  local HOSTPORT=$CONTAINER_HOSTPORT  
+  local HOSTPORT=$CONTAINER_HOSTPORT
   run curl -s -f $HOSTPORT/config_dump
   [ "$status" -eq 0 ]
   echo "$output" | jq --raw-output '.configs[2].dynamic_listeners[].active_state.listener.filter_chains[0].filters[0].typed_config.http_filters[] | select(.name == "envoy.filters.http.rbac") | .typed_config'
@@ -321,7 +323,7 @@ function get_envoy_network_rbac_once {
 
 function get_envoy_listener_filters {
   check_hostport $1
-  local HOSTPORT=$CONTAINER_HOSTPORT  
+  local HOSTPORT=$CONTAINER_HOSTPORT
   run retry_default curl -s -f $HOSTPORT/config_dump
   [ "$status" -eq 0 ]
   echo "$output" | jq --raw-output '.configs[2].dynamic_listeners[].active_state.listener | "\(.name) \( .filter_chains[0].filters | map(.name) | join(","))"'
