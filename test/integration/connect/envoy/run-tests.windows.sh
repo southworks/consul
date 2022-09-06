@@ -332,7 +332,7 @@ function verify {
 
   # need to tell the PID 1 inside of the container that it won't be actual PID
   # 1 because we're using --pid=host so we use TINI_SUBREAPER
-  if docker.exe exec -i envoy_consul-${CLUSTER}_1 bash -c "/c/bats/bin/bats /c/workdir/${CLUSTER}/bats/verify.bats" ; then
+  if docker.exe exec -i ${SINGLE_CONTAINER_BASE_NAME}-${CLUSTER}_1 bash -c "/c/bats/bin/bats --pretty /c/workdir/${CLUSTER}/bats" ; then
     echogreen "✓ PASS"
   else
     echored "⨯ FAIL"
