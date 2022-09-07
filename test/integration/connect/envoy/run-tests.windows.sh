@@ -20,7 +20,7 @@ XDS_TARGET=${XDS_TARGET:-server}
 ENVOY_VERSION=${ENVOY_VERSION:-"1.22.1"}
 export ENVOY_VERSION
 
-export DOCKER_BUILDKIT=1
+export DOCKER_BUILDKIT=0
 
 if [ ! -z "$DEBUG" ] ; then
   set -x
@@ -332,7 +332,11 @@ function verify {
 
   # need to tell the PID 1 inside of the container that it won't be actual PID
   # 1 because we're using --pid=host so we use TINI_SUBREAPER
-  if docker.exe exec -i ${SINGLE_CONTAINER_BASE_NAME}-${CLUSTER}_1 bash -c "/c/bats/bin/bats --pretty /c/workdir/${CLUSTER}/bats" ; then
+  if docker.exe exec -i ${SINGLE_CONTAINER_BASE_NAME}-${CLUSTER}_1 bash -c "TINI_SUBREAPER=1 \
+                                                                            ENVOY_VERSION=${ENVOY_VERSION} \
+                                                                            /c/bats/bin/bats \
+                                                                            --pretty \
+                                                                            /c/workdir/${CLUSTER}/bats" ; then
     echogreen "✓ PASS"
   else
     echored "⨯ FAIL"
