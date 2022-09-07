@@ -102,7 +102,6 @@ function is_set {
 }
 
 function get_cert {
-  check_hostport $1
   local HOSTPORT=$1
   local SERVER_NAME=$2
   local CA_FILE=$3
