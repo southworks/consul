@@ -60,7 +60,6 @@ function init_workdir {
   # don't wipe logs between runs as they are already split and we need them to
   # upload as artifacts later.
   rm -rf workdir/${CLUSTER}
-  rm -rf workdir/logs
   mkdir -p workdir/${CLUSTER}/{consul,consul-server,register,envoy,bats,statsd,data}
 
   # Reload consul config from defaults
@@ -243,8 +242,6 @@ function start_consul {
     docker.exe run -d --name envoy_consul-${DC}_1 \
       --net=envoy-tests \
       $WORKDIR_SNIPPET \
-      --memory 4096m \
-      --cpus 2 \
       --hostname "consul-${DC}" \
       --network-alias "consul-${DC}-client" \
       --network-alias "consul-${DC}-server" \
