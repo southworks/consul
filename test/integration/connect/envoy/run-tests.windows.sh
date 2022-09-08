@@ -60,6 +60,7 @@ function init_workdir {
   # don't wipe logs between runs as they are already split and we need them to
   # upload as artifacts later.
   rm -rf workdir/${CLUSTER}
+  rm -rf workdir/logs
   mkdir -p workdir/${CLUSTER}/{consul,consul-server,register,envoy,bats,statsd,data}
 
   # Reload consul config from defaults
@@ -242,6 +243,8 @@ function start_consul {
     docker.exe run -d --name envoy_consul-${DC}_1 \
       --net=envoy-tests \
       $WORKDIR_SNIPPET \
+      --memory 4096m \
+      --cpus 2 \
       --hostname "consul-${DC}" \
       --network-alias "consul-${DC}-client" \
       --network-alias "consul-${DC}-server" \
@@ -557,10 +560,6 @@ function suite_setup {
         --net=none \
         "${HASHICORP_DOCKER_PROXY}/windows/kubernetes/pause" &>/dev/null
     # TODO(rb): switch back to "${HASHICORP_DOCKER_PROXY}/google/pause" once that is cached
-
-    # pre-build the test-sds-server container
-    echo "Rebuilding 'test-sds-server' image..."
-    docker.exe build -t test-sds-server -f Dockerfile-test-sds-server-windows test-sds-server
 }
 
 function suite_teardown {
@@ -811,6 +810,8 @@ function run_container_zipkin {
 }
 
 function run_container_jaeger {
+  echo "Starting Jaeger service..."
+
   local DC=${1:-primary}
   local CONTAINER_NAME="$SINGLE_CONTAINER_BASE_NAME"-"$DC"_1
 
@@ -819,10 +820,13 @@ function run_container_jaeger {
 }
 
 function run_container_test-sds-server {
-  docker.exe run -d --name $(container_name) \
-    $WORKDIR_SNIPPET \
-    $(network_snippet primary) \
-    "test-sds-server"
+  echo "Starting test-sds-server"
+  
+  local DC=${1:-primary}
+  local CONTAINER_NAME="$SINGLE_CONTAINER_BASE_NAME"-"$DC"_1
+
+  docker.exe exec -d $CONTAINER_NAME bash -c "cd /c/test-sds-server &&
+                                              ./test-sds-server.exe"
 }
 
 function container_name {
