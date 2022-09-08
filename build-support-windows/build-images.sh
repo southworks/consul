@@ -36,9 +36,6 @@ echo " "
 echo "Tag Kubernetes/pause image"
 docker tag mcr.microsoft.com/oss/kubernetes/pause:3.6 "${HASHICORP_DOCKER_PROXY}/windows/kubernetes/pause"
 
-# Build Windows Jaegertracing Image
-docker build -t "${HASHICORP_DOCKER_PROXY}/windows/jaegertracing" -f Dockerfile-jaegertracing-windows .
-
 # Build Windows Openzipkin Image
 docker build -t "${HASHICORP_DOCKER_PROXY}/windows/openzipkin" -f Dockerfile-openzipkin-windows .
 
