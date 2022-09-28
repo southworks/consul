@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -24,6 +26,9 @@ import (
 )
 
 var update = flag.Bool("update", false, "update golden files")
+
+const TestDefaultUnixAdminAccessLogPath = "/dev/null"
+const TestDefaultWindowsAdminAccessLogPath = "nul"
 
 func TestEnvoyCommand_noTabs(t *testing.T) {
 	t.Parallel()
@@ -154,6 +159,27 @@ func TestGenerateConfig(t *testing.T) {
 					AgentPort:    "8502", // Note this is the gRPC port
 				},
 				AdminAccessLogPath:    "/dev/null",
+				AdminBindAddress:      "127.0.0.1",
+				AdminBindPort:         "19000",
+				LocalAgentClusterName: xds.LocalAgentClusterName,
+				PrometheusBackendPort: "",
+				PrometheusScrapePath:  "/metrics",
+			},
+		},
+		{
+			Name:  "defaults-windows",
+			Flags: []string{"-proxy-id", "test-proxy"},
+			WantArgs: BootstrapTplArgs{
+				ProxyCluster: "test-proxy",
+				ProxyID:      "test-proxy",
+				// We don't know this til after the lookup so it will be empty in the
+				// initial args call we are testing here.
+				ProxySourceService: "",
+				GRPC: GRPC{
+					AgentAddress: "127.0.0.1",
+					AgentPort:    "8502", // Note this is the gRPC port
+				},
+				AdminAccessLogPath:    "nul",
 				AdminBindAddress:      "127.0.0.1",
 				AdminBindPort:         "19000",
 				LocalAgentClusterName: xds.LocalAgentClusterName,
@@ -1040,21 +1066,35 @@ func TestGenerateConfig(t *testing.T) {
 
 			// Verify we handled the env and flags right first to get correct template
 			// args.
+			osPlatform := runtime.GOOS
 			got, err := c.templateArgs()
+
+			// Quick fix to set the Unix default in the admin-access-log-path parameter when OS is Windows
+			// TODO: We should support a new attribute in the "generateConfigTestCase" struct that indicates the OS Platform
+			if osPlatform == "windows" && tc.WantArgs.AdminAccessLogPath == TestDefaultUnixAdminAccessLogPath {
+				got.AdminAccessLogPath = TestDefaultUnixAdminAccessLogPath
+			}
+
 			require.NoError(t, err) // Error cases should have returned above
 			require.Equal(t, &tc.WantArgs, got)
 
-			actual := ui.OutputWriter.Bytes()
+			actual := string(ui.OutputWriter.Bytes())
+			// Quick fix to replace the Unix default path in the admin-access-log-path parameter when OS is Windows
+			// TODO: We should support a new attribute in the "generateConfigTestCase" struct that indicates the OS Platform
+			if osPlatform == "windows" && tc.WantArgs.AdminAccessLogPath == TestDefaultUnixAdminAccessLogPath {
+				mregexp, _ := regexp.Compile("\"nul\"")
+				actual = mregexp.ReplaceAllString(actual, "\"/dev/null\"")
+			}
 
 			// If we got the arg handling write, verify output
 			golden := filepath.Join("testdata", tc.Name+".golden")
 			if *update {
-				ioutil.WriteFile(golden, actual, 0644)
+				ioutil.WriteFile(golden, []byte(actual), 0644)
 			}
 
 			expected, err := ioutil.ReadFile(golden)
 			require.NoError(t, err)
-			require.Equal(t, string(expected), string(actual))
+			require.Equal(t, string(expected), actual)
 		})
 	}
 }

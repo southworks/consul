@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/mitchellh/cli"
@@ -28,7 +29,9 @@ func New(ui cli.Ui) *cmd {
 	return c
 }
 
-const DefaultAdminAccessLogPath = "/dev/null"
+const DefaultUnixAdminAccessLogPath = "/dev/null"
+const DefaultWindowsAdminAccessLogPath = "nul"
+const OSPlatform = runtime.GOOS
 
 type cmd struct {
 	UI     cli.Ui
@@ -106,10 +109,17 @@ func (c *cmd) init() {
 		"The full path to the envoy binary to run. By default will just search "+
 			"$PATH. Ignored if -bootstrap is used.")
 
-	c.flags.StringVar(&c.adminAccessLogPath, "admin-access-log-path", DefaultAdminAccessLogPath,
-		fmt.Sprintf("The path to write the access log for the administration server. If no access "+
-			"log is desired specify %q. By default it will use %q.",
-			DefaultAdminAccessLogPath, DefaultAdminAccessLogPath))
+	if OSPlatform == "windows" {
+		c.flags.StringVar(&c.adminAccessLogPath, "admin-access-log-path", DefaultWindowsAdminAccessLogPath,
+			fmt.Sprintf("The path to write the access log for the administration server. If no access "+
+				"log is desired specify %q. By default it will use %q.",
+				DefaultWindowsAdminAccessLogPath, DefaultWindowsAdminAccessLogPath))
+	} else {
+		c.flags.StringVar(&c.adminAccessLogPath, "admin-access-log-path", DefaultUnixAdminAccessLogPath,
+			fmt.Sprintf("The path to write the access log for the administration server. If no access "+
+				"log is desired specify %q. By default it will use %q.",
+				DefaultUnixAdminAccessLogPath, DefaultUnixAdminAccessLogPath))
+	}
 
 	c.flags.StringVar(&c.adminBind, "admin-bind", "localhost:19000",
 		"The address:port to start envoy's admin server on. Envoy requires this "+
@@ -504,7 +514,11 @@ func (c *cmd) templateArgs() (*BootstrapTplArgs, error) {
 
 	adminAccessLogPath := c.adminAccessLogPath
 	if adminAccessLogPath == "" {
-		adminAccessLogPath = DefaultAdminAccessLogPath
+		if OSPlatform == "windows" {
+			adminAccessLogPath = DefaultWindowsAdminAccessLogPath
+		} else {
+			adminAccessLogPath = DefaultUnixAdminAccessLogPath
+		}
 	}
 
 	var caPEM string
