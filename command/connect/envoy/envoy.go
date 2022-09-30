@@ -23,15 +23,14 @@ import (
 	"github.com/hashicorp/consul/tlsutil"
 )
 
-func New(ui cli.Ui) *cmd {
+func New(ui cli.Ui, osPlatform string) *cmd {
 	c := &cmd{UI: ui}
-	c.init()
+	c.init(osPlatform)
 	return c
 }
 
 const DefaultUnixAdminAccessLogPath = "/dev/null"
 const DefaultWindowsAdminAccessLogPath = "nul"
-const OSPlatform = runtime.GOOS
 
 type cmd struct {
 	UI     cli.Ui
@@ -83,7 +82,7 @@ var supportedGateways = map[string]api.ServiceKind{
 	"ingress":     api.ServiceKindIngressGateway,
 }
 
-func (c *cmd) init() {
+func (c *cmd) init(osPlatform string) {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
 	c.flags.StringVar(&c.proxyID, "proxy-id", os.Getenv("CONNECT_PROXY_ID"),
@@ -109,7 +108,7 @@ func (c *cmd) init() {
 		"The full path to the envoy binary to run. By default will just search "+
 			"$PATH. Ignored if -bootstrap is used.")
 
-	if OSPlatform == "windows" {
+	if osPlatform == "windows" {
 		c.flags.StringVar(&c.adminAccessLogPath, "admin-access-log-path", DefaultWindowsAdminAccessLogPath,
 			fmt.Sprintf("The path to write the access log for the administration server. If no access "+
 				"log is desired specify %q. By default it will use %q.",
@@ -258,10 +257,11 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 	// TODO: refactor
-	return c.run(c.flags.Args())
+	osPlatform := runtime.GOOS
+	return c.run(c.flags.Args(), osPlatform)
 }
 
-func (c *cmd) run(args []string) int {
+func (c *cmd) run(args []string, osPlatform string) int {
 
 	if c.nodeName != "" && c.proxyID == "" {
 		c.UI.Error("'-node-name' requires '-proxy-id'")
@@ -428,7 +428,7 @@ func (c *cmd) run(args []string) int {
 	}
 
 	// Generate config
-	bootstrapJson, err := c.generateConfig()
+	bootstrapJson, err := c.generateConfig(osPlatform)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
@@ -471,7 +471,7 @@ func (c *cmd) findBinary() (string, error) {
 	return exec.LookPath("envoy")
 }
 
-func (c *cmd) templateArgs() (*BootstrapTplArgs, error) {
+func (c *cmd) templateArgs(osPlatform string) (*BootstrapTplArgs, error) {
 	httpCfg := api.DefaultConfig()
 	c.http.MergeOntoConfig(httpCfg)
 
@@ -514,7 +514,7 @@ func (c *cmd) templateArgs() (*BootstrapTplArgs, error) {
 
 	adminAccessLogPath := c.adminAccessLogPath
 	if adminAccessLogPath == "" {
-		if OSPlatform == "windows" {
+		if osPlatform == "windows" {
 			adminAccessLogPath = DefaultWindowsAdminAccessLogPath
 		} else {
 			adminAccessLogPath = DefaultUnixAdminAccessLogPath
@@ -552,8 +552,8 @@ func (c *cmd) templateArgs() (*BootstrapTplArgs, error) {
 	}, nil
 }
 
-func (c *cmd) generateConfig() ([]byte, error) {
-	args, err := c.templateArgs()
+func (c *cmd) generateConfig(osPlatform string) ([]byte, error) {
+	args, err := c.templateArgs(osPlatform)
 	if err != nil {
 		return nil, err
 	}
