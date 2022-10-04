@@ -230,7 +230,7 @@ function start_consul {
       $WORKDIR_SNIPPET \
       --hostname "consul-${DC}-server" \
       --network-alias "consul-${DC}-server" \
-      -e "CONSUL_LICENSE=$license" \     
+      -e "CONSUL_LICENSE=$license" \
       windows/consul:local \
       agent -dev -datacenter "${DC}" \
       -config-dir "C:\\workdir\\${DC}\\consul" \
