@@ -87,7 +87,7 @@ then
     echo "Completed  16%"
     XDS_TARGET=$XDS_TARGET go test -v -timeout=30m -tags integration ./test/integration/connect/envoy -run="TestEnvoy/case-grpc" -win=true > test/integration/connect/envoy/results/case-grpc.log
     echo "Completed  32%"
-    XDS_TARGET=$XDS_TARGET go test -v -timeout=30m -tags integration ./test/integration/connect/envoy -run="TestEnvoy/case-http" -win=true > test/integration/connect/envoy/results/case-http.log
+    XDS_TARGET=$XDS_TARGET go test -v -timeout=30m -tags integration ./test/integration/connect/envoy -run="TestEnvoy/case-http$" -win=true > test/integration/connect/envoy/results/case-http.log
     echo "Completed  48%"
     XDS_TARGET=$XDS_TARGET go test -v -timeout=30m -tags integration ./test/integration/connect/envoy -run="TestEnvoy/case-http-badauthz" -win=true > test/integration/connect/envoy/results/case-http-badauthz.log
     echo "Completed  66%"
@@ -169,7 +169,7 @@ then
     echo "Completed 16"
     XDS_TARGET=$XDS_TARGET go test -v -timeout=30m -tags integration ./test/integration/connect/envoy -run="TestEnvoy/case-grpc" -win=true > test/integration/connect/envoy/results/case-grpc.log
     echo "Completed 17"
-    XDS_TARGET=$XDS_TARGET go test -v -timeout=30m -tags integration ./test/integration/connect/envoy -run="TestEnvoy/case-http" -win=true > test/integration/connect/envoy/results/case-http.log
+    XDS_TARGET=$XDS_TARGET go test -v -timeout=30m -tags integration ./test/integration/connect/envoy -run="TestEnvoy/case-http$" -win=true > test/integration/connect/envoy/results/case-http.log
     echo "Completed 18"
     XDS_TARGET=$XDS_TARGET go test -v -timeout=30m -tags integration ./test/integration/connect/envoy -run="TestEnvoy/case-http-badauthz" -win=true > test/integration/connect/envoy/results/case-http-badauthz.log
     echo "Completed 19"
