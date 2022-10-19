@@ -107,7 +107,7 @@ func execEnvoy(binary string, prefixArgs, suffixArgs []string, bootstrapJSON []b
 		envoyArgs = append(envoyArgs, "--disable-hot-restart")
 	}
 	envoyArgs = append(envoyArgs, suffixArgs...)
-	envoyArgs = append(envoyArgs, "-c", tempFile)
+	envoyArgs = append(envoyArgs, "--config-path", tempFile)
 
 	// Exec
 	if proc, err := startProc(binary, envoyArgs); err == nil {
