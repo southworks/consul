@@ -153,7 +153,8 @@ func (s *Server) StreamResources(stream pbpeerstream.PeerStreamService_StreamRes
 		return grpcstatus.Error(codes.InvalidArgument, "initial subscription request must specify a PeerID")
 	}
 
-	_, p, err := s.GetStore().PeeringReadByID(nil, req.PeerID)
+	var p *pbpeering.Peering
+	_, p, err = s.GetStore().PeeringReadByID(nil, req.PeerID)
 	if err != nil {
 		logger.Error("failed to look up peer", "peer_id", req.PeerID, "error", err)
 		return grpcstatus.Error(codes.Internal, "failed to find PeerID: "+req.PeerID)
@@ -161,6 +162,12 @@ func (s *Server) StreamResources(stream pbpeerstream.PeerStreamService_StreamRes
 	if p == nil {
 		return grpcstatus.Error(codes.InvalidArgument, "initial subscription for unknown PeerID: "+req.PeerID)
 	}
+	// Clone the peering because we will modify and rewrite it.
+	p, ok := proto.Clone(p).(*pbpeering.Peering)
+	if !ok {
+		return grpcstatus.Errorf(codes.Internal, "unexpected error while cloning a Peering object.")
+	}
+
 	if !p.IsActive() {
 		// If peering is terminated, then our peer sent the termination message.
 		// For other non-active states, send the termination message.
@@ -215,9 +222,14 @@ func (s *Server) StreamResources(stream pbpeerstream.PeerStreamService_StreamRes
 				},
 			},
 		}
-		err = s.Backend.PeeringSecretsWrite(promoted)
+
+		p.Remote = req.Remote
+		err = s.Backend.PeeringWrite(&pbpeering.PeeringWriteRequest{
+			Peering:        p,
+			SecretsRequest: promoted,
+		})
 		if err != nil {
-			return grpcstatus.Errorf(codes.Internal, "failed to persist peering secret: %v", err)
+			return grpcstatus.Errorf(codes.Internal, "failed to persist peering: %v", err)
 		}
 	}
 	if !authorized {
@@ -351,8 +363,19 @@ func (s *Server) realHandleStream(streamReq HandleStreamRequest) error {
 		err := streamReq.Stream.Send(msg)
 		sendMutex.Unlock()
 
-		if err != nil {
-			status.TrackSendError(err.Error())
+		// We only track send successes and errors for response types because this is meant to track
+		// resources, not request/ack messages.
+		if msg.GetResponse() != nil {
+			if err != nil {
+				if id := msg.GetResponse().GetResourceID(); id != "" {
+					logger.Error("failed to send resource", "resourceID", id, "error", err)
+					status.TrackSendError(err.Error())
+					return nil
+				}
+				status.TrackSendError(err.Error())
+			} else {
+				status.TrackSendSuccess()
+			}
 		}
 		return err
 	}
@@ -429,6 +452,9 @@ func (s *Server) realHandleStream(streamReq HandleStreamRequest) error {
 	defer func() {
 		incomingHeartbeatCtxCancel()
 	}()
+
+	// The nonce is used to correlate response/(ack|nack) pairs.
+	var nonce uint64
 
 	// The main loop that processes sends and receives.
 	for {
@@ -579,7 +605,6 @@ func (s *Server) realHandleStream(streamReq HandleStreamRequest) error {
 			}
 
 			if resp := msg.GetResponse(); resp != nil {
-				// TODO(peering): Ensure there's a nonce
 				reply, err := s.processResponse(streamReq.PeerName, streamReq.Partition, status, resp)
 				if err != nil {
 					logger.Error("failed to persist resource", "resourceURL", resp.ResourceURL, "resourceID", resp.ResourceID)
@@ -663,6 +688,10 @@ func (s *Server) realHandleStream(streamReq HandleStreamRequest) error {
 				continue
 			}
 
+			// Assign a new unique nonce to the response.
+			nonce++
+			resp.Nonce = fmt.Sprintf("%08x", nonce)
+
 			replResp := makeReplicationResponse(resp)
 			if err := streamSend(replResp); err != nil {
 				// note: govet warns of context leak but it is cleaned up in a defer
@@ -680,7 +709,7 @@ func getTrustDomain(store StateStore, logger hclog.Logger) (string, error) {
 		return "", grpcstatus.Error(codes.Internal, "failed to read Connect CA Config")
 	case cfg == nil:
 		logger.Warn("cannot begin stream because Connect CA is not yet initialized")
-		return "", grpcstatus.Error(codes.FailedPrecondition, "Connect CA is not yet initialized")
+		return "", grpcstatus.Error(codes.Unavailable, "Connect CA is not yet initialized")
 	}
 	return connect.SpiffeIDSigningForCluster(cfg.ClusterID).Host(), nil
 }

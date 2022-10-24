@@ -11,7 +11,7 @@ description: >-
 
 This topic provides an overview of Consul Dataplane, a lightweight process for managing Envoy proxies introduced in Consul v1.14.0. Consul Dataplane removes the need to run client agents on every node in a cluster for service discovery and service mesh. Instead, Consul deploys sidecar proxies that provide lower latency, support additional runtimes, and integrate with cloud infrastructure providers.
 
-Consul Dataplane requires servers running Consul v1.14.0-beta1+.
+Consul Dataplane requires servers running Consul v1.14.0-beta1+ and Consul K8s v1.0.0-beta1+.
 
 ## What is Consul Dataplane?
 
@@ -33,8 +33,8 @@ Consul Dataplane manages Envoy proxies and leaves responsibility for other funct
 
 To get started with Consul Dataplane, use the following reference resources:
 
-- For `consul-dataplane` commands and usage examples, including required flags for startup, refer to the [`consul-dataplane` CLI reference](/consul/docs/dataplane/consul-dataplane).
-- For Helm chart information, refer to the [Helm Chart reference](/consul/docs/k8s/helm).
+- For `consul-dataplane` commands and usage examples, including required flags for startup, refer to the [`consul-dataplane` CLI reference](/docs/connect/dataplane/consul-dataplane).
+- For Helm chart information, refer to the [Helm Chart reference](/docs/k8s/helm).
 - For Envoy, Consul, and Consul Dataplane version compatibility, refer to the [Envoy compatibility matrix](/docs/connect/proxies/envoy).
 
 ### Installation
@@ -44,14 +44,14 @@ To install the beta release of Consul Dataplane, set `VERSION` to `1.0.0-beta` a
 #### Helm
 
 ```shell-session
-$ export VERSION=1.0.0-beta
+$ export VERSION=1.0.0-beta3
 $ helm install consul hashicorp/consul --set global.name=consul --version ${VERSION} --create-namespace --namespace consul
 ```
 
 #### Consul-k8s CLI
 
 ```shell-session
-$ export VERSION=1.0.0-beta && \
+$ export VERSION=1.0.0-beta3 && \
     curl --location "https://releases.hashicorp.com/consul-k8s/${VERSION}/consul-k8s_${VERSION}_darwin_amd64.zip" --output consul-k8s-cli.zip
 ```
 

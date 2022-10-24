@@ -6,8 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mitchellh/copystructure"
-
 	"github.com/hashicorp/consul/acl"
 	"github.com/hashicorp/consul/agent/proxycfg/internal/watch"
 	"github.com/hashicorp/consul/agent/structs"
@@ -348,6 +346,17 @@ func (c *configSnapshotTerminatingGateway) isEmpty() bool {
 		!c.MeshConfigSet
 }
 
+type PeerServersValue struct {
+	Addresses []structs.ServiceAddress
+	Index     uint64
+	UseCDS    bool
+}
+
+type PeeringServiceValue struct {
+	Nodes  structs.CheckServiceNodes
+	UseCDS bool
+}
+
 type configSnapshotMeshGateway struct {
 	// WatchedServices is a map of service name to a cancel function. This cancel
 	// function is tied to the watch of connect enabled services for the given
@@ -373,6 +382,19 @@ type configSnapshotMeshGateway struct {
 	// service in the local datacenter.
 	ServiceGroups map[structs.ServiceName]structs.CheckServiceNodes
 
+	// PeeringServices is a map of peer name -> (map of
+	// service name -> CheckServiceNodes) and is used to determine the backing
+	// endpoints of a service on a peer.
+	PeeringServices map[string]map[structs.ServiceName]PeeringServiceValue
+
+	// WatchedPeeringServices is a map of peer name -> (map of service name ->
+	// cancel function) and is used to track watches on services within a peer.
+	WatchedPeeringServices map[string]map[structs.ServiceName]context.CancelFunc
+
+	// WatchedPeers is a map of peer name -> cancel functions. It is used to
+	// track watches on peers.
+	WatchedPeers map[string]context.CancelFunc
+
 	// ServiceResolvers is a map of service name to an associated
 	// service-resolver config entry for that service.
 	ServiceResolvers map[structs.ServiceName]*structs.ServiceResolverConfigEntry
@@ -385,11 +407,11 @@ type configSnapshotMeshGateway struct {
 	// datacenter.
 	FedStateGateways map[string]structs.CheckServiceNodes
 
-	// WatchedConsulServers is a map of (structs.ConsulServiceName -> structs.CheckServiceNodes)`
+	// WatchedLocalServers is a map of (structs.ConsulServiceName -> structs.CheckServiceNodes)`
 	// Mesh gateways can spin up watches for local servers both for
 	// WAN federation and for peering. This map ensures we only have one
 	// watch at a time.
-	WatchedConsulServers watch.Map[string, structs.CheckServiceNodes]
+	WatchedLocalServers watch.Map[string, structs.CheckServiceNodes]
 
 	// HostnameDatacenters is a map of datacenters to mesh gateway instances with a hostname as the address.
 	// If hostnames are configured they must be provided to Envoy via CDS not EDS.
@@ -430,6 +452,13 @@ type configSnapshotMeshGateway struct {
 	// LeafCertWatchCancel is a CancelFunc to use when refreshing this gateway's
 	// leaf cert watch with different parameters.
 	LeafCertWatchCancel context.CancelFunc
+
+	// PeerServers is the map of peering server names to their addresses.
+	PeerServers map[string]PeerServersValue
+
+	// PeerServersWatchCancel is a CancelFunc to use when resetting the watch
+	// on all peerings as it is enabled/disabled.
+	PeerServersWatchCancel context.CancelFunc
 
 	// PeeringTrustBundles is the list of trust bundles for peers where
 	// services have been exported to using this mesh gateway.
@@ -570,7 +599,7 @@ func (c *configSnapshotMeshGateway) isEmpty() bool {
 		len(c.GatewayGroups) == 0 &&
 		len(c.FedStateGateways) == 0 &&
 		len(c.HostnameDatacenters) == 0 &&
-		c.WatchedConsulServers.Len() == 0 &&
+		c.WatchedLocalServers.Len() == 0 &&
 		c.isEmptyPeering()
 }
 
@@ -706,7 +735,7 @@ func (s *ConfigSnapshot) Valid() bool {
 			s.TerminatingGateway.MeshConfigSet
 
 	case structs.ServiceKindMeshGateway:
-		if s.MeshGateway.WatchedConsulServers.Len() == 0 {
+		if s.MeshGateway.WatchedLocalServers.Len() == 0 {
 			if s.ServiceMeta[structs.MetaWANFederationKey] == "1" {
 				return false
 			}
@@ -733,13 +762,8 @@ func (s *ConfigSnapshot) Valid() bool {
 
 // Clone makes a deep copy of the snapshot we can send to other goroutines
 // without worrying that they will racily read or mutate shared maps etc.
-func (s *ConfigSnapshot) Clone() (*ConfigSnapshot, error) {
-	snapCopy, err := copystructure.Copy(s)
-	if err != nil {
-		return nil, err
-	}
-
-	snap := snapCopy.(*ConfigSnapshot)
+func (s *ConfigSnapshot) Clone() *ConfigSnapshot {
+	snap := s.DeepCopy()
 
 	// nil these out as anything receiving one of these clones does not need them and should never "cancel" our watches
 	switch s.Kind {
@@ -766,7 +790,7 @@ func (s *ConfigSnapshot) Clone() (*ConfigSnapshot, error) {
 		snap.IngressGateway.LeafCertWatchCancel = nil
 	}
 
-	return snap, nil
+	return snap
 }
 
 func (s *ConfigSnapshot) Leaf() *structs.IssuedCert {

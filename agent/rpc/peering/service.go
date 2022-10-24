@@ -1,6 +1,7 @@
 package peering
 
 import (
+	"container/ring"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/armon/go-metrics"
+	"github.com/hashicorp/consul/lib/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-memdb"
 	"github.com/hashicorp/go-multierror"
@@ -34,6 +36,15 @@ var (
 	errPeeringTokenEmptyServerAddresses = errors.New("peering token server addresses value is empty")
 	errPeeringTokenEmptyServerName      = errors.New("peering token server name value is empty")
 	errPeeringTokenEmptyPeerID          = errors.New("peering token peer ID value is empty")
+)
+
+const (
+	// meshGatewayWait is the initial wait on calls to exchange a secret with a peer when dialing through a gateway.
+	// This wait provides some time for the first gateway address to configure a route to the peer servers.
+	// Why 350ms? That is roughly the p50 latency we observed in a scale test for proxy config propagation:
+	// https://www.hashicorp.com/cgsb
+	meshGatewayWait      = 350 * time.Millisecond
+	establishmentTimeout = 5 * time.Second
 )
 
 // errPeeringInvalidServerAddress is returned when an establish request contains
@@ -114,22 +125,25 @@ type Backend interface {
 	// partition and namespace from the token.
 	ResolveTokenAndDefaultMeta(token string, entMeta *acl.EnterpriseMeta, authzCtx *acl.AuthorizerContext) (resolver.Result, error)
 
-	// GetAgentCACertificates returns the CA certificate to be returned in the peering token data
-	GetAgentCACertificates() ([]string, error)
+	// GetTLSMaterials returns the TLS materials for the dialer to dial the acceptor using TLS.
+	// It returns the server name to validate, and the CA certificate to validate with.
+	GetTLSMaterials(generatingToken bool) (string, []string, error)
 
-	// GetServerAddresses returns the addresses used for establishing a peering connection.
+	// GetLocalServerAddresses returns the addresses used for establishing a peering connection.
 	// These may be server addresses or mesh gateway addresses if peering through mesh gateways.
-	GetServerAddresses() ([]string, error)
-
-	// GetServerName returns the SNI to be returned in the peering token data which
-	// will be used by peers when establishing peering connections over TLS.
-	GetServerName() string
+	GetLocalServerAddresses() ([]string, error)
 
 	// EncodeToken packages a peering token into a slice of bytes.
 	EncodeToken(tok *structs.PeeringToken) ([]byte, error)
 
 	// DecodeToken unpackages a peering token from a slice of bytes.
 	DecodeToken([]byte) (*structs.PeeringToken, error)
+
+	// GetDialAddresses returns: the addresses to cycle through when dialing a peer's servers,
+	// a boolean indicating whether mesh gateways are present, and an optional error.
+	// The resulting ring buffer is front-loaded with the local mesh gateway addresses if the local
+	// datacenter is configured to dial through mesh gateways.
+	GetDialAddresses(logger hclog.Logger, ws memdb.WatchSet, peerID string) (*ring.Ring, bool, error)
 
 	EnterpriseCheckPartitions(partition string) error
 
@@ -224,6 +238,11 @@ func (s *Server) GenerateToken(
 		return nil, err
 	}
 
+	serverName, caPEMs, err := s.Backend.GetTLSMaterials(true)
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		peering  *pbpeering.Peering
 		secretID string
@@ -291,17 +310,12 @@ func (s *Server) GenerateToken(
 		break
 	}
 
-	ca, err := s.Backend.GetAgentCACertificates()
-	if err != nil {
-		return nil, err
-	}
-
 	// ServerExternalAddresses must be formatted as addr:port.
 	var serverAddrs []string
 	if len(req.ServerExternalAddresses) > 0 {
 		serverAddrs = req.ServerExternalAddresses
 	} else {
-		serverAddrs, err = s.Backend.GetServerAddresses()
+		serverAddrs, err = s.Backend.GetLocalServerAddresses()
 		if err != nil {
 			return nil, err
 		}
@@ -310,10 +324,14 @@ func (s *Server) GenerateToken(
 	tok := structs.PeeringToken{
 		// Store the UUID so that we can do a global search when handling inbound streams.
 		PeerID:              peering.ID,
-		CA:                  ca,
+		CA:                  caPEMs,
 		ServerAddresses:     serverAddrs,
-		ServerName:          s.Backend.GetServerName(),
+		ServerName:          serverName,
 		EstablishmentSecret: secretID,
+		Remote: structs.PeeringTokenRemote{
+			Partition:  req.PartitionOrDefault(),
+			Datacenter: s.Datacenter,
+		},
 	}
 
 	encoded, err := s.Backend.EncodeToken(&tok)
@@ -385,7 +403,7 @@ func (s *Server) Establish(
 		return nil, err
 	}
 
-	if err := s.validatePeeringLocality(tok, entMeta.PartitionOrEmpty()); err != nil {
+	if err := s.validatePeeringLocality(tok); err != nil {
 		return nil, err
 	}
 
@@ -418,45 +436,45 @@ func (s *Server) Establish(
 		PeerServerName:      tok.ServerName,
 		PeerID:              tok.PeerID,
 		Meta:                req.Meta,
-		State:               pbpeering.PeeringState_ESTABLISHING,
+
+		// State is intentionally not set until after the secret exchange succeeds.
+		// This is to prevent a scenario where an active peering is re-established,
+		// the secret exchange fails, and the peering state gets stuck in "Establishing"
+		// while the original connection is still active.
+		// State: pbpeering.PeeringState_ESTABLISHING,
 
 		// PartitionOrEmpty is used to avoid writing "default" in OSS.
 		Partition: entMeta.PartitionOrEmpty(),
+		Remote: &pbpeering.RemoteInfo{
+			Partition:  tok.Remote.Partition,
+			Datacenter: tok.Remote.Datacenter,
+		},
 	}
 
-	tlsOption, err := peering.TLSDialOption()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build TLS dial option from peering: %w", err)
+	// Write the peering ahead of the ExchangeSecret handshake to give
+	// mesh gateways in the default partition an opportunity
+	// to update their config with an outbound route to this peer server.
+	//
+	// If the request to exchange a secret fails then the peering will continue to exist.
+	// We do not undo this write because this call to establish may actually be a re-establish call
+	// for an active peering.
+	writeReq := &pbpeering.PeeringWriteRequest{
+		Peering: peering,
+	}
+	if err := s.Backend.PeeringWrite(writeReq); err != nil {
+		return nil, fmt.Errorf("failed to write peering: %w", err)
 	}
 
-	exchangeReq := pbpeerstream.ExchangeSecretRequest{
-		PeerID:              peering.PeerID,
-		EstablishmentSecret: tok.EstablishmentSecret,
-	}
-	var exchangeResp *pbpeerstream.ExchangeSecretResponse
-
-	// Loop through the known server addresses once, attempting to fetch the long-lived stream secret.
-	var dialErrors error
-	for _, addr := range serverAddrs {
-		exchangeResp, err = exchangeSecret(ctx, addr, tlsOption, &exchangeReq)
-		if err != nil {
-			dialErrors = multierror.Append(dialErrors, fmt.Errorf("failed to exchange peering secret with %q: %w", addr, err))
-		}
-		if exchangeResp != nil {
-			break
-		}
-	}
+	exchangeResp, dialErrors := s.exchangeSecret(ctx, peering, tok.EstablishmentSecret)
 	if exchangeResp == nil {
 		return nil, dialErrors
 	}
+	peering.State = pbpeering.PeeringState_ESTABLISHING
 
 	// As soon as a peering is written with a non-empty list of ServerAddresses
 	// and an active stream secret, a leader routine will see the peering and
 	// attempt to establish a peering stream with the remote peer.
-	//
-	// This peer now has a record of both the LocalPeerID(ID) and
-	// RemotePeerID(PeerID) but at this point the other peer does not.
-	writeReq := &pbpeering.PeeringWriteRequest{
+	writeReq = &pbpeering.PeeringWriteRequest{
 		Peering: peering,
 		SecretsRequest: &pbpeering.SecretsWriteRequest{
 			PeerID: peering.ID,
@@ -470,48 +488,96 @@ func (s *Server) Establish(
 	if err := s.Backend.PeeringWrite(writeReq); err != nil {
 		return nil, fmt.Errorf("failed to write peering: %w", err)
 	}
-	// TODO(peering): low prio: consider adding response details
 	return resp, nil
 }
 
-// validatePeeringLocality makes sure that we don't create a peering in the cluster/partition it was generated.
-// We validate by looking at the remote PeerID from the PeeringToken and looking up that peering in the partition.
-// If there is one and the request partition is the same, then we are attempting to peer within the partition, which we shouldn't.
-// We also perform a check to verify if the ServerName of the PeeringToken overlaps with our own, we do not process it
-// unless we've been able to find the peering in the store, i.e. this peering is between two local partitions.
-func (s *Server) validatePeeringLocality(token *structs.PeeringToken, partition string) error {
-	_, peering, err := s.Backend.Store().PeeringReadByID(nil, token.PeerID)
+// validatePeeringLocality makes sure that we don't create a peering in the same cluster it was generated.
+// If the ServerName of the PeeringToken overlaps with our own, we do not accept it.
+func (s *Server) validatePeeringLocality(token *structs.PeeringToken) error {
+	serverName, _, err := s.Backend.GetTLSMaterials(false)
 	if err != nil {
-		return fmt.Errorf("cannot read peering by ID: %w", err)
+		return fmt.Errorf("failed to fetch TLS materials: %w", err)
 	}
-
-	// If the token has the same server name as this cluster, but we can't find the peering
-	// in our store, it indicates a naming conflict.
-	if s.Backend.GetServerName() == token.ServerName && peering == nil {
-		return fmt.Errorf("conflict - peering token's server name matches the current cluster's server name, %q, but there is no record in the database", s.Backend.GetServerName())
+	if serverName == token.ServerName {
+		return fmt.Errorf(
+			"cannot create a peering within the same cluster %q. Refer to the `exported-services` documentation if you want to export between partitions without peering",
+			serverName)
 	}
-
-	if peering != nil && acl.EqualPartitions(peering.GetPartition(), partition) {
-		return fmt.Errorf("cannot create a peering within the same partition (ENT) or cluster (OSS)")
-	}
-
 	return nil
 }
 
-func exchangeSecret(ctx context.Context, addr string, tlsOption grpc.DialOption, req *pbpeerstream.ExchangeSecretRequest) (*pbpeerstream.ExchangeSecretResponse, error) {
-	dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+// exchangeSecret will continuously attempt to exchange the given establishment secret with the peer, up to a timeout.
+// This function will attempt to dial through mesh gateways if the local DC is configured to peer through gateways,
+// but will fall back to server addresses if not.
+func (s *Server) exchangeSecret(ctx context.Context, peering *pbpeering.Peering, establishmentSecret string) (*pbpeerstream.ExchangeSecretResponse, error) {
+	req := pbpeerstream.ExchangeSecretRequest{
+		PeerID:              peering.PeerID,
+		EstablishmentSecret: establishmentSecret,
+	}
+
+	tlsOption, err := peering.TLSDialOption()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build TLS dial option from peering: %w", err)
+	}
+
+	ringBuf, usingGateways, err := s.Backend.GetDialAddresses(s.Logger, nil, peering.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get addresses to dial peer: %w", err)
+	}
+
+	var (
+		resp       *pbpeerstream.ExchangeSecretResponse
+		dialErrors error
+	)
+
+	retryWait := 150 * time.Millisecond
+	jitter := retry.NewJitter(25)
+
+	if usingGateways {
+		// If we are dialing through local gateways we sleep before issuing the first request.
+		// This gives the local gateways some time to configure a route to the peer servers.
+		time.Sleep(meshGatewayWait)
+	}
+
+	retryCtx, cancel := context.WithTimeout(ctx, establishmentTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(dialCtx, addr,
-		tlsOption,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial peer: %w", err)
-	}
-	defer conn.Close()
+	for retryCtx.Err() == nil {
+		addr := ringBuf.Value.(string)
 
-	client := pbpeerstream.NewPeerStreamServiceClient(conn)
-	return client.ExchangeSecret(ctx, req)
+		dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+
+		conn, err := grpc.DialContext(dialCtx, addr,
+			tlsOption,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to dial peer: %w", err)
+		}
+		defer conn.Close()
+
+		client := pbpeerstream.NewPeerStreamServiceClient(conn)
+		resp, err = client.ExchangeSecret(ctx, &req)
+
+		// If we got a permission denied error that means out establishment secret is invalid, so we do not retry.
+		grpcErr, ok := grpcstatus.FromError(err)
+		if ok && grpcErr.Code() == codes.PermissionDenied {
+			return nil, fmt.Errorf("a new peering token must be generated: %w", grpcErr.Err())
+		}
+		if err != nil {
+			dialErrors = multierror.Append(dialErrors, fmt.Errorf("failed to exchange peering secret through address %q: %w", addr, err))
+		}
+		if resp != nil {
+			// Got a valid response. We're done.
+			break
+		}
+
+		time.Sleep(jitter(retryWait))
+
+		// Cycle to the next possible address.
+		ringBuf = ringBuf.Next()
+	}
+	return resp, dialErrors
 }
 
 // OPTIMIZE: Handle blocking queries
@@ -607,7 +673,7 @@ func (s *Server) PeeringList(ctx context.Context, req *pbpeering.PeeringListRequ
 
 	defer metrics.MeasureSince([]string{"peering", "list"}, time.Now())
 
-	_, peerings, err := s.Backend.Store().PeeringList(nil, *entMeta)
+	idx, peerings, err := s.Backend.Store().PeeringList(nil, *entMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -619,7 +685,7 @@ func (s *Server) PeeringList(ctx context.Context, req *pbpeering.PeeringListRequ
 		cPeerings = append(cPeerings, cp)
 	}
 
-	return &pbpeering.PeeringListResponse{Peerings: cPeerings}, nil
+	return &pbpeering.PeeringListResponse{Peerings: cPeerings, Index: idx}, nil
 }
 
 // TODO(peering): Get rid of this func when we stop using the stream tracker for imported/ exported services and the peering state
@@ -630,8 +696,10 @@ func (s *Server) PeeringList(ctx context.Context, req *pbpeering.PeeringListRequ
 func (s *Server) reconcilePeering(peering *pbpeering.Peering) *pbpeering.Peering {
 	streamState, found := s.Tracker.StreamStatus(peering.ID)
 	if !found {
+		// TODO(peering): this may be noise on non-leaders
 		s.Logger.Warn("did not find peer in stream tracker; cannot populate imported and"+
 			" exported services count or reconcile peering state", "peerID", peering.ID)
+		peering.StreamStatus = &pbpeering.StreamStatus{}
 		return peering
 	} else {
 		cp := copyPeering(peering)
@@ -643,11 +711,26 @@ func (s *Server) reconcilePeering(peering *pbpeering.Peering) *pbpeering.Peering
 			cp.State = pbpeering.PeeringState_FAILING
 		}
 
-		// add imported & exported services
-		cp.ImportedServices = streamState.ImportedServices
-		cp.ExportedServices = streamState.ExportedServices
-		cp.ImportedServiceCount = streamState.GetImportedServicesCount()
-		cp.ExportedServiceCount = streamState.GetExportedServicesCount()
+		latest := func(tt ...time.Time) time.Time {
+			latest := time.Time{}
+			for _, t := range tt {
+				if t.After(latest) {
+					latest = t
+				}
+			}
+			return latest
+		}
+
+		lastRecv := latest(streamState.LastRecvHeartbeat, streamState.LastRecvError, streamState.LastRecvResourceSuccess)
+		lastSend := latest(streamState.LastSendError, streamState.LastSendSuccess)
+
+		cp.StreamStatus = &pbpeering.StreamStatus{
+			ImportedServices: streamState.ImportedServices,
+			ExportedServices: streamState.ExportedServices,
+			LastHeartbeat:    structs.TimeToProto(streamState.LastRecvHeartbeat),
+			LastReceive:      structs.TimeToProto(lastRecv),
+			LastSend:         structs.TimeToProto(lastSend),
+		}
 
 		return cp
 	}

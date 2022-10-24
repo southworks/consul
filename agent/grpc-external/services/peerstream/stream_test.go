@@ -43,7 +43,6 @@ import (
 
 const (
 	testPeerID                = "caf067a6-f112-4907-9101-d45857d2b149"
-	testActiveStreamSecretID  = "e778c518-f0db-473a-9224-24b357da971d"
 	testPendingStreamSecretID = "522c0daf-2ef2-4dab-bc78-5e04e3daf552"
 	testEstablishmentSecretID = "f6569d37-1c5b-4415-aae5-26f4594f7f60"
 )
@@ -573,8 +572,14 @@ func TestStreamResources_Server_StreamTracker(t *testing.T) {
 	})
 
 	var lastSendAck time.Time
+	var lastSendSuccess time.Time
 
 	client.DrainStream(t)
+
+	// Manually grab the last success time from sending the trust bundle or exported services list.
+	status, ok := srv.StreamStatus(testPeerID)
+	require.True(t, ok)
+	lastSendSuccess = status.LastSendSuccess
 
 	testutil.RunStep(t, "ack tracked as success", func(t *testing.T) {
 		ack := &pbpeerstream.ReplicationMessage{
@@ -590,11 +595,13 @@ func TestStreamResources_Server_StreamTracker(t *testing.T) {
 		}
 
 		lastSendAck = it.FutureNow(1)
+
 		err := client.Send(ack)
 		require.NoError(t, err)
 
 		expect := Status{
 			Connected:        true,
+			LastSendSuccess:  lastSendSuccess,
 			LastAck:          lastSendAck,
 			ExportedServices: []string{},
 		}
@@ -632,6 +639,7 @@ func TestStreamResources_Server_StreamTracker(t *testing.T) {
 
 		expect := Status{
 			Connected:        true,
+			LastSendSuccess:  lastSendSuccess,
 			LastAck:          lastSendAck,
 			LastNack:         lastNack,
 			LastNackMessage:  lastNackMsg,
@@ -683,6 +691,7 @@ func TestStreamResources_Server_StreamTracker(t *testing.T) {
 
 		expect := Status{
 			Connected:               true,
+			LastSendSuccess:         lastSendSuccess,
 			LastAck:                 lastSendAck,
 			LastNack:                lastNack,
 			LastNackMessage:         lastNackMsg,
@@ -738,6 +747,7 @@ func TestStreamResources_Server_StreamTracker(t *testing.T) {
 
 		expect := Status{
 			Connected:               true,
+			LastSendSuccess:         lastSendSuccess,
 			LastAck:                 lastSendAck,
 			LastNack:                lastNack,
 			LastNackMessage:         lastNackMsg,
@@ -767,6 +777,7 @@ func TestStreamResources_Server_StreamTracker(t *testing.T) {
 
 		expect := Status{
 			Connected:               true,
+			LastSendSuccess:         lastSendSuccess,
 			LastAck:                 lastSendAck,
 			LastNack:                lastNack,
 			LastNackMessage:         lastNackMsg,
@@ -794,6 +805,7 @@ func TestStreamResources_Server_StreamTracker(t *testing.T) {
 		expect := Status{
 			Connected:               false,
 			DisconnectErrorMessage:  lastRecvErrorMsg,
+			LastSendSuccess:         lastSendSuccess,
 			LastAck:                 lastSendAck,
 			LastNack:                lastNack,
 			LastNackMessage:         lastNackMsg,
@@ -1147,6 +1159,55 @@ func TestStreamResources_Server_CARootUpdates(t *testing.T) {
 				require.Equal(t, expect, trustBundle.TrustDomain)
 			},
 		)
+	})
+}
+
+func TestStreamResources_Server_AckNackNonce(t *testing.T) {
+	srv, store := newTestServer(t, func(c *Config) {
+		c.incomingHeartbeatTimeout = 50 * time.Millisecond
+	})
+
+	p := writePeeringToBeDialed(t, store, 1, "my-peer")
+	require.Empty(t, p.PeerID, "should be empty if being dialed")
+
+	// Set the initial roots and CA configuration.
+	_, _ = writeInitialRootsAndCA(t, store)
+
+	client := makeClient(t, srv, testPeerID)
+	client.DrainStream(t)
+
+	testutil.RunStep(t, "ack contains nonce from response", func(t *testing.T) {
+		resp := &pbpeerstream.ReplicationMessage{
+			Payload: &pbpeerstream.ReplicationMessage_Response_{
+				Response: &pbpeerstream.ReplicationMessage_Response{
+					ResourceURL: pbpeerstream.TypeURLExportedService,
+					Operation:   pbpeerstream.Operation_OPERATION_UPSERT,
+					Nonce:       "1234",
+				},
+			},
+		}
+		require.NoError(t, client.Send(resp))
+
+		msg, err := client.Recv()
+		require.NoError(t, err)
+		require.Equal(t, "1234", msg.GetRequest().ResponseNonce)
+	})
+
+	testutil.RunStep(t, "nack contains nonce from response", func(t *testing.T) {
+		resp := &pbpeerstream.ReplicationMessage{
+			Payload: &pbpeerstream.ReplicationMessage_Response_{
+				Response: &pbpeerstream.ReplicationMessage_Response{
+					ResourceURL: pbpeerstream.TypeURLExportedService,
+					Operation:   pbpeerstream.Operation_OPERATION_UNSPECIFIED, // Unspecified gets NACK
+					Nonce:       "5678",
+				},
+			},
+		}
+		require.NoError(t, client.Send(resp))
+
+		msg, err := client.Recv()
+		require.NoError(t, err)
+		require.Equal(t, "5678", msg.GetRequest().ResponseNonce)
 	})
 }
 
@@ -1607,6 +1668,28 @@ func Test_processResponse_Validation(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "missing a nonce",
+			in: &pbpeerstream.ReplicationMessage_Response{
+				ResourceURL: pbpeerstream.TypeURLExportedService,
+				ResourceID:  "web",
+				Nonce:       "",
+				Operation:   pbpeerstream.Operation_OPERATION_UNSPECIFIED,
+			},
+			expect: &pbpeerstream.ReplicationMessage{
+				Payload: &pbpeerstream.ReplicationMessage_Request_{
+					Request: &pbpeerstream.ReplicationMessage_Request{
+						ResourceURL:   pbpeerstream.TypeURLExportedService,
+						ResponseNonce: "",
+						Error: &pbstatus.Status{
+							Code:    int32(code.Code_INVALID_ARGUMENT),
+							Message: fmt.Sprintf(`received response without a nonce for: %s:web`, pbpeerstream.TypeURLExportedService),
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "unknown operation",
 			in: &pbpeerstream.ReplicationMessage_Response{
 				ResourceURL: pbpeerstream.TypeURLExportedService,
@@ -1797,8 +1880,15 @@ func expectReplEvents(t *testing.T, client *MockClient, checkFns ...func(t *test
 		}
 	})
 
+	nonces := make(map[string]struct{})
 	for i := 0; i < num; i++ {
 		checkFns[i](t, out[i])
+
+		// Ensure every nonce was unique.
+		if resp := out[i].GetResponse(); resp != nil {
+			require.NotContains(t, nonces, resp.Nonce)
+			nonces[resp.Nonce] = struct{}{}
+		}
 	}
 }
 
@@ -1867,6 +1957,7 @@ func Test_processResponse_ExportedServiceUpdates(t *testing.T) {
 			resp := &pbpeerstream.ReplicationMessage_Response{
 				ResourceURL: pbpeerstream.TypeURLExportedServiceList,
 				ResourceID:  subExportedServiceList,
+				Nonce:       "2",
 				Operation:   pbpeerstream.Operation_OPERATION_UPSERT,
 				Resource:    makeAnyPB(t, &pbpeerstream.ExportedServiceList{Services: tc.exportedServices}),
 			}
