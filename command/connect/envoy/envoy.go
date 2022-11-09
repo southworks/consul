@@ -28,8 +28,6 @@ func New(ui cli.Ui) *cmd {
 	return c
 }
 
-// const DefaultAdminAccessLogPath = "/dev/null"
-
 type cmd struct {
 	UI     cli.Ui
 	flags  *flag.FlagSet
