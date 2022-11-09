@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul
 
-go 1.18
+go 1.19
 
 replace github.com/hashicorp/consul/api => ./api
 
@@ -31,7 +31,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4
 	github.com/hashicorp/consul-awsauth v0.0.0-20220713182709-05ac1c5c2706
 	github.com/hashicorp/consul-net-rpc v0.0.0-20220307172752-3602954411b4
-	github.com/hashicorp/consul/api v1.15.2
+	github.com/hashicorp/consul/api v1.15.3
 	github.com/hashicorp/consul/proto-public v0.1.0
 	github.com/hashicorp/consul/sdk v0.11.0
 	github.com/hashicorp/go-bexpr v0.1.2
@@ -40,7 +40,7 @@ require (
 	github.com/hashicorp/go-connlimit v0.3.0
 	github.com/hashicorp/go-discover v0.0.0-20220411141802-20db45f7f0f9
 	github.com/hashicorp/go-hclog v1.2.1
-	github.com/hashicorp/go-memdb v1.3.2
+	github.com/hashicorp/go-memdb v1.3.4
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-raftchunking v0.6.2
 	github.com/hashicorp/go-sockaddr v1.0.2

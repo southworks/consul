@@ -63,10 +63,7 @@ func makeExportedServiceListResponse(
 // makeServiceResponse handles preparing exported service instance updates to the peer cluster.
 // Each cache.UpdateEvent will contain all instances for a service name.
 // If there are no instances in the event, we consider that to be a de-registration.
-func makeServiceResponse(
-	mst *MutableStatus,
-	update cache.UpdateEvent,
-) (*pbpeerstream.ReplicationMessage_Response, error) {
+func makeServiceResponse(update cache.UpdateEvent) (*pbpeerstream.ReplicationMessage_Response, error) {
 	serviceName := strings.TrimPrefix(update.CorrelationID, subExportedService)
 	csn, ok := update.Result.(*pbservice.IndexedCheckServiceNodes)
 	if !ok {
@@ -290,7 +287,6 @@ func (s *Server) handleUpsertExportedServiceList(
 	if err != nil {
 		return err
 	}
-
 	for _, sn := range serviceList {
 		if _, ok := exportedServices[sn]; !ok {
 			err := s.handleUpdateService(peerName, partition, sn, nil)
@@ -327,9 +323,12 @@ func (s *Server) handleUpdateService(
 		return fmt.Errorf("failed to read imported services: %w", err)
 	}
 
-	structsNodes, err := export.CheckServiceNodesToStruct()
-	if err != nil {
-		return fmt.Errorf("failed to convert protobuf instances to structs: %w", err)
+	structsNodes := []structs.CheckServiceNode{}
+	if export != nil {
+		structsNodes, err = export.CheckServiceNodesToStruct()
+		if err != nil {
+			return fmt.Errorf("failed to convert protobuf instances to structs: %w", err)
+		}
 	}
 
 	// Normalize the data into a convenient form for operation.
